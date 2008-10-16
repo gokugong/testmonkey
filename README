@@ -2,6 +2,11 @@ TestMonkey
 Automated Javascript Unit Test Framework
 
 
+This is brand new spanking code and is not yet stable and should be used with precaution. 
+
+
+
+
 Copyright 2006-2008 Appcelerator, Inc.
 
    Licensed under the Apache License, Version 2.0 (the "License");
