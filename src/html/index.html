@@ -1,0 +1,142 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+
+<html>
+<head>
+	<script type="text/javascript" charset="utf-8" src="javascripts/appcelerator-debug.js"></script>
+	<script type="text/javascript" charset="utf-8" src="javascripts/testmonkey.js"></script>
+	<style type="text/css" media="screen">
+		.failed
+		{
+			background-color:#CD9B9B;
+			color:#900;
+			font-weight:bold;
+		}
+		.passed
+		{
+			background-color:#20D040;
+			color:#000;
+			font-weight:bold;
+		}
+		span.error
+		{
+			padding-left:15px;
+			color:#900;
+			font-weight:bold;
+			background-image:url(images/warning.png);
+			background-repeat:no-repeat;
+		}
+		span.count
+		{
+			font-size:10px;
+		}
+		div.testdetail div
+		{
+			float:left;
+		}
+		div.clear 
+		{
+			clear:both;
+			margin-bottom:10px;
+		}
+		div.testresult
+		{
+			width:100px;
+			padding:3px;
+			padding-left:6px;
+			margin-right:10px;
+		}
+		div.testdetail
+		{
+			cursor:pointer;
+		}
+		div.error_msg
+		{
+			padding-left:20px;
+			color:#900;
+			font-weight:bold;
+			background-image:url(images/warning.png);
+			background-repeat:no-repeat;
+		}
+		div.result 
+		{
+			margin:8px;
+			padding:10px;
+			background-color:#eee;
+		}
+		div.error span.fn
+		{
+			background-color:#CD9B9B !important;
+			color:#900;
+			font-weight:bold;
+		}
+		div.testsuite
+		{
+			font-size:18px;
+			font-weight:bold;
+			margin-bottom:20px;
+		}
+		div.end_testsuite
+		{
+			margin-top:30px;
+			border-top:1px solid #aaa;
+			margin-bottom:10px;
+		}
+		#results
+		{
+			font-family:"Bitstream Vera Sans Mono","Monaco","Lucida Sans Typewriter Regular","Courier New", Courier, monospace;
+			white-space: pre;
+		}
+	</style>
+</head>
+<body id="body">
+	<div id="results"></div>
+	<script>
+		$(document).ready(function()
+		{
+			testSuite("Set of tests for Test Monkey",
+			{
+				run:function()
+				{
+					test("test that succeeds",function()
+					{
+						assert( 1 + 1 == 2);
+						assert(true);
+						$('body').assertCSS('visibility','visible');
+					});
+					testAsync("test with explicit failure",1000,function()
+					{
+						assert( 1 + 1 == 2);
+						assert(true);
+						$('body').assertCSS('visibility','visible');
+						fail("this is a message")
+					});
+					testAsync("test to show multiple assert failures",1000,function()
+					{
+						assert(1 + 1 < 0);
+						assert(1 + 1 == 2);
+						assert("yes");
+						assert(false);
+						end();
+					});
+					testAsync("test to show undefined error",1000,function()
+					{
+						assert(1 + foo);
+						end();
+					});
+					test("inline failures",function()
+					{
+						assert(false);
+					});
+					test("empty test",function()
+					{
+						
+					});
+				}
+			}).run();
+
+//			testRunner("Test for Test Framework");
+		});
+	</script>
+</body>
+</html>
