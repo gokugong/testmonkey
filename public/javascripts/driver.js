@@ -1,5 +1,31 @@
 $(document).ready(function()
 {
+	$.getJSON(AppC.docRoot+'tests/manifest.js',function(json)
+	{
+		$.each(json.suites,function()
+		{
+			$.getScript(AppC.docRoot+'tests/'+this);
+		});
+	});
+	
+	$("#run").on("click",function()
+	{
+		$("#results").empty();
+		testRunner($("#selector select").val());
+	});
+
+	$("#runall").on("click",function()
+	{
+		$("#results").empty();
+		var select = $("#selector select").get(0);
+		var tests = [];
+		for (var c=0;c<select.length;c++)
+		{
+			tests.push(select.options[c].text);
+		}
+		testRunner(tests);
+	});
+	
 	function leadingWhitepsace(code)
 	{
 		var count = 0;
@@ -24,6 +50,11 @@ $(document).ready(function()
 		{
 			switch(name)
 			{
+				case 'addTestSuite':
+				{
+					$("#selector select").append("<option>"+result+"</option>");
+					break;
+				}
 				case 'beforeTestSuite':
 				{
 					$("#results").append("<div class='testsuite'>Test Suite: "+result+"</div>");

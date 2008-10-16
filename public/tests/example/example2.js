@@ -9,5 +9,10 @@ testSuite("Another set of example tests",
 			assert( 1 - 1 == 0 );
 			assert( 1 / 1 == 1 );
 		});
+
+		test("we like strings",function()
+		{
+			assert( "a" + "b" == "ab" );
+		});
 	}
 })

@@ -3,10 +3,10 @@ body
 	padding:10px;
 	padding-left:25px;
 	padding-right:25px;
+	font-family:"Bitstream Vera Sans Mono","Monaco","Lucida Sans Typewriter Regular","Courier New", Courier, monospace;
 }
 h1
 {
-	font-family:"Bitstream Vera Sans Mono","Monaco","Lucida Sans Typewriter Regular","Courier New", Courier, monospace;
 	font-size:24px;
 	font-weight:bold;
 	color:#555;
@@ -23,7 +23,7 @@ h1 span
 }
 .failed
 {
-	background-color:#CD9B9B;
+	background-color:#CD9B9B; 
 	color:#900;
 	font-weight:bold;
 }
@@ -38,7 +38,7 @@ span.error
 	padding-left:15px;
 	color:#900;
 	font-weight:bold;
-	background-image:url(images/warning.png);
+	background-image:url(../images/warning.png);
 	background-repeat:no-repeat;
 }
 span.count
@@ -99,6 +99,30 @@ div.end_testsuite
 }
 #results
 {
-	font-family:"Bitstream Vera Sans Mono","Monaco","Lucida Sans Typewriter Regular","Courier New", Courier, monospace;
 	white-space: pre;
+}
+#selector
+{
+	position:absolute;
+	top:38px;
+	right:100px;
+	font-size:18px;
+}
+#selector select
+{
+	font-size:18px;
+	margin-right:20px;
+}
+#selector button
+{
+	font-size:18px;
+	width:110px;
+}
+
+div.intro
+{
+	margin-top:50px;
+	font-size:30px;
+	color:#999;
+	text-align:center;
 }
