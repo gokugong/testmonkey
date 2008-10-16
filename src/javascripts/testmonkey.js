@@ -150,14 +150,6 @@
 		var testcase = currentTestCase;
 		var assert = testcase.asserts[idx];
 		var target = this;
-		// var isGlobal = false;
-		// if (this == window)
-		// {
-		// 	isGlobal = true;
-		// 	target = $(args[0]);
-		// 	args = args.slice(1);
-		// }
-		
 		try
 		{
 			switch(type)
@@ -200,7 +192,6 @@
 	
 	function executeTest(testcase,descriptor)
 	{
-//		$.info('execute test case with '+testcase.name+', code='+testcase.code);
 		testcase.results = [];
 		testcase.running = true;
 		currentTestCase = testcase;
