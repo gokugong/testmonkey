@@ -126,7 +126,12 @@
 		{
 			if (currentSuite!=nextTestCase.suite)
 			{
-				if (currentSuite) fireEvent('afterTestSuite',currentSuite);
+				if (currentSuite)
+				{
+					fireEvent('afterTestSuite',currentSuite);
+					var currentD = testSuites[currentSuite];
+					if (currentD.htmlID) removeTestFrame(currentD.htmlID);
+				}
 				currentSuite = nextTestCase.suite;
 				fireEvent('beforeTestSuite',currentSuite);
 			}
@@ -150,7 +155,12 @@
 		}
 		else
 		{
-			if (currentSuite) fireEvent('afterTestSuite',currentSuite);
+			if (currentSuite)
+			{
+				fireEvent('afterTestSuite',currentSuite);
+				var currentD = testSuites[currentSuite];
+				if (currentD.htmlID) removeTestFrame(currentD.htmlID);
+			}
 			fireEvent('afterTestCases',testCases);
 			fireEvent('afterTestRunner');
 		}
@@ -337,13 +347,24 @@
 	
 	function loadTestFrame(url,fn)
 	{
-		var id = ++testFrameId;
+		var id = '__testdriver_content_'+(testFrameId++);
 		url = URI.absolutizeURI(url,AppC.docRoot+'tests/');
-		$("<iframe id='test_"+id+"' src='"+url+"' frameborder='0' height='1' width='1' style='position:absolute;left:-100px;top:-10px;'></iframe>").appendTo("body");
-		$("#test_"+id).load(function()
+		$("<iframe id='"+id+"' src='"+url+"' frameborder='0' height='1' width='1' style='position:absolute;left:-100px;top:-10px;'></iframe>").appendTo("body");
+		$('#'+id).load(function()
 		{
-			fn('test_'+id);
+			fn(id);
 		});
+	}
+	
+	function removeTestFrame(id)
+	{
+		// for this frame, we need to drop back to DOM instead of just .remove it seems
+		var el = $("#"+id);
+		if (el.length > 0)
+		{
+			var node = el.get(0);
+			node.parentNode.removeChild(node);
+		}
 	}
 	
 	function escapeString(str)
