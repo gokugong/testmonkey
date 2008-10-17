@@ -45,7 +45,7 @@ $(document).ready(function()
 	
 	var idCounter = 1;
 	
-	installTestRunnerPlugin({
+	TestMonkey.installTestRunnerPlugin({
 		onEvent: function(name,result)
 		{
 			switch(name)
@@ -137,6 +137,10 @@ $(document).ready(function()
 						if (result.error)
 						{
 							html+="<div class='error_msg'>" + result.error + "</div>";
+						}
+						if (result.logs)
+						{
+							html+="<div class='logs'><h1>Test log results:</h1>" + result.logs.join("\n") + "</div>";
 						}
 						html+="</div>";
 						$("#results").append(html);

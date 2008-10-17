@@ -26,6 +26,7 @@ h1 span
 	background-color:#CD9B9B; 
 	color:#900;
 	font-weight:bold;
+	margin-right:12px;
 }
 .passed
 {
@@ -35,7 +36,7 @@ h1 span
 }
 span.error
 {
-	padding-left:15px;
+	padding-left:20px;
 	color:#900;
 	font-weight:bold;
 	background-image:url(../images/warning.png);
@@ -125,4 +126,18 @@ div.intro
 	font-size:30px;
 	color:#999;
 	text-align:center;
+}
+div.logs
+{
+	margin-top:20px;
+	white-space: pre;
+	font-size:10px;
+	color:#777;
+}
+div.logs h1
+{
+	font-size:14px;
+	font-weight:bold;
+	margin-bottom:5px;
+	padding-bottom:0;
 }

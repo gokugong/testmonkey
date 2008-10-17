@@ -1,3 +1,5 @@
+window.TestMonkey = {};
+
 (function(scope,$){
 
 	var testRunnerPlugin = null;
@@ -22,12 +24,18 @@
 		}
 	}
 
-	scope.installTestRunnerPlugin = function(callback)
+	var assertions = {};
+	var currentDescriptor = null, currentSuite = null;
+	
+	TestMonkey.installTestRunnerPlugin = function(callback)
 	{
 		testRunnerPlugin = callback;
 	};
 	
-	var currentDescriptor = null, currentSuite = null;
+	TestMonkey.installAssertionType = function(name,handler)
+	{
+		assertions[name]=handler;
+	};
 	
 	scope.testRunner = function()
 	{
@@ -171,47 +179,101 @@
 		switch(typeof(value))
 		{
 			case 'boolean':
-				return value===true;
+				return [value===true,value];
 			case 'function':
 				value = $.toFunction('(' + String(value) + ')()')();
-				return (value) ? true : false;
+				return [(value ? true : false), value];
 			default:
-				return (value) ? true : false;
+				return [(value ? true : false), value];
 		}
 	}
+	
+	TestMonkey.installAssertionType('',function(testcase,assertion,args)
+	{
+		return runAssertion(args[0]);
+	});
+	
+	TestMonkey.installAssertionType('Visible',function(testcase,assertion,args)
+	{
+		return [this.css('visibility')=='visible',this.css('visibility')];
+	});
+
+	TestMonkey.installAssertionType('Hidden',function(testcase,assertion,args)
+	{
+		return [this.css('visibility')=='hidden',this.css('visibility')];
+	});
+
+	TestMonkey.installAssertionType('Disabled',function(testcase,assertion,args)
+	{
+		return [this.attr('disabled'),this.attr('disabled')];
+	});
+
+	TestMonkey.installAssertionType('Enabled',function(testcase,assertion,args)
+	{
+		return [!this.attr('disabled'),this.attr('disabled')];
+	});
+
+	TestMonkey.installAssertionType('CSS',function(testcase,assertion,args)
+	{
+		return [this.css(args[0]) == args[1],this.css(args[0])];
+	});
+
+	TestMonkey.installAssertionType('Attr',function(testcase,assertion,args)
+	{
+		return [String(this.attr(args[0])) == String(args[1]),String(this.attr(args[0]))];
+	});
+
+	TestMonkey.installAssertionType('Class',function(testcase,assertion,args)
+	{
+		return [this.hasClass(args[0]),this.attr('class')];
+	});
+	
+	TestMonkey.installAssertionType('HTML',function(testcase,assertion,args)
+	{
+		return [this.html()==args[0],this.html()];
+	});
+
+	TestMonkey.installAssertionType('Value',function(testcase,assertion,args)
+	{
+		return [this.val()==args[0],this.val()];
+	});
+
+	TestMonkey.installAssertionType('Text',function(testcase,assertion,args)
+	{
+		return [this.text()==args[0],this.text()];
+	});
+
+	TestMonkey.installAssertionType('Empty',function(testcase,assertion,args)
+	{
+		return [this.text()=='',this.text()];
+	});
+
+	TestMonkey.installAssertionType('Checked',function(testcase,assertion,args)
+	{
+		return [this.get(0).checked,this.get(0).checked];
+	});
+
+	TestMonkey.installAssertionType('Unchecked',function(testcase,assertion,args)
+	{
+		return [!this.get(0).checked,this.get(0).checked];
+	});
 	
 	function internalAssert()
 	{
 		var idx = arguments[0], type = arguments[1]||'';
 		var args = $.makeArray(arguments).splice(2);
-		var result = null;
+		var result = false;
 		var testcase = currentTestCase;
 		var assert = testcase.asserts[idx];
-		var target = this;
 		try
 		{
-			switch(type)
+			var handler = assertions[type];
+			if (handler)
 			{
-				case '':
-				{
-					result = runAssertion(args[0]);
-					break;
-				}
-				case 'Visible':
-				{
-					break;
-				}
-				case 'CSS':
-				{
-					result = target.css(args[0]) == args[1];
-					break;
-				}
-				default:
-				{
-					break;
-				}
+				result = handler.apply(this,[testcase,assert,args]);
 			}
-			testcase.results.push({assert:assert,result:result,idx:idx});
+			var message = result[0] ? null : 'value was "' + result[1] + '" (' + typeof(result[1]) + ')';
+			testcase.results.push({assert:assert,result:result[0],message:message,idx:idx});
 		}
 		catch (E)
 		{
@@ -243,6 +305,14 @@
 		function $(selector)
 		{ 
 			return jQuery("#"+descriptor.htmlID).contents().find(selector);
+		}
+		function log(msg)
+		{
+			if (!testcase.logs)
+			{
+				testcase.logs = [];
+			}
+			testcase.logs.push(msg);
 		}
 		function fail(msg)
 		{
@@ -363,7 +433,10 @@
 		if (el.length > 0)
 		{
 			var node = el.get(0);
-			node.parentNode.removeChild(node);
+			setTimeout(function()
+			{
+				node.parentNode.removeChild(node);
+			},10);
 		}
 	}
 	
