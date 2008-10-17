@@ -9854,7 +9854,6 @@ $.fn.destroy = function()
 {
 	var scope = $(this);
 	if (!scope.attr('id')) return this; // we always add id, ignore if we don't have one
-	$.info('destroyed called = '+scope.attr('id'));
 	$.each(this,function()
 	{
 		var el = $(this);
