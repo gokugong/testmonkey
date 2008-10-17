@@ -87,15 +87,14 @@ div.error span.fn
 }
 div.testsuite
 {
-	font-size:18px;
-	font-weight:bold;
-	margin-bottom:20px;
+	font-size:14px;
+	color:#444;
+	font-weight:normal;
+	margin-bottom:10px;
 }
 div.end_testsuite
 {
-	margin-top:30px;
-	border-top:1px solid #aaa;
-	margin-bottom:10px;
+
 }
 #results
 {
@@ -125,4 +124,47 @@ div.intro
 	font-size:30px;
 	color:#999;
 	text-align:center;
+}
+
+.testcounts
+{
+	padding:5px;
+	background-color:#ccc;
+	padding-left:10px;
+	padding-right:10px;
+}
+.status_bar
+{
+	border:1px solid #ccc;
+	height:15px;
+	padding:2px;
+}
+.passed_bar
+{
+	background-color:green;
+	height:15px;
+	width:15px;
+	float:left;
+	margin-right:3px;
+	cursor:pointer;
+}
+.failed_bar
+{
+	background-color:orange;
+	height:15px;
+	width:15px;
+	float:left;
+	margin-right:3px;
+	cursor:pointer;
+
+}
+.error_bar
+{
+	background-color:red;
+	height:15px;
+	width:15px;
+	float:left;
+	margin-right:3px;
+	cursor:pointer;
+	
 }

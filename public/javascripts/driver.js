@@ -44,8 +44,12 @@ $(document).ready(function()
 	}
 	
 	var idCounter = 1;
+	var testCount = 0;
+	var suiteCount = 0;
+	var assertCount = 0;
 	
 	installTestRunnerPlugin({
+		
 		onEvent: function(name,result)
 		{
 			switch(name)
@@ -57,12 +61,32 @@ $(document).ready(function()
 				}
 				case 'beforeTestSuite':
 				{
-					$("#results").append("<div class='testsuite'>Test Suite: "+result+"</div>");
+					$("#results").append("<table><thead><td>Suite</td><td>Passed</td><td>Failed</td><td>Errors</td></thead><tr><td><div class='testsuite'>"+result+"</div></td>");
+					break;
+				}
+				case 'beforeTestRunner':
+				{
+					suiteCount = result.length;
+					$('#suite_count').html(suiteCount);
+					break;
+				}
+				case 'beforeTestCases':
+				{
+					testCount = result.length;
+					$('#test_count').html(result.length);
+					$('#summary').css('display','block')
+					break;
+				}
+				case 'beforeTestCase':
+				{
+					assertCount +=result.asserts.length;
+					$('#assert_count').html(assertCount)
+
 					break;
 				}
 				case 'afterTestSuite':
 				{
-					$("#results").append("<div class='end_testsuite'></div>");
+					$("#results").append("</tr>");
 					break;
 				}
 				case 'afterTestCase':
@@ -71,11 +95,28 @@ $(document).ready(function()
 					{
 						var errorMessage = result.testcase;
 						var failedCount = 0;
+						$.info('result.results ' + result.results)
 						$.each(result.results,function()
 						{
-							failedCount+=this.result ? 0 : 1;
+							failedCount +=this.result ? 0 : 1;
 							var cls = this.result ? 'passed' : 'failed';
+							
 							var idx = errorMessage.indexOf(this.assert);
+							$.info('error ' +this.error)
+
+							if (this.error)
+							{
+								$('#status_bar').append('<div class="error_bar"></div>');
+							}
+							else if (cls=='passed')
+							{
+								$('#status_bar').append('<div class="passed_bar"></div>');
+							}
+							else 
+							{
+								$('#status_bar').append('<div class="failed_bar"></div>');								
+							}
+
 							if (idx != -1)
 							{
 								var newMessage = errorMessage.substring(0,idx);
@@ -131,7 +172,7 @@ $(document).ready(function()
 							errorMessage = 'test("' + result.name + '",<span class="fn">'+errorMessage+'</span>);'
 						}
 						var id = idCounter++;
-						var html = "<div class='testdetail' id='test_"+id+"'><div class='testresult "+(result.failed?'failed':'passed')+"'>"+(result.error ? 'Error' : result.failed?('Failed <span class="count">('+failedCount+')</span>'):'Passed')+"</div><div>"+result.name+"</div></div><div class='clear'></div>"; 
+						var html = "<div style='display:none' class='testdetail' id='test_"+id+"'><div class='testresult "+(result.failed?'failed':'passed')+"'>"+(result.error ? 'Error' : result.failed?('Failed <span class="count">('+failedCount+')</span>'):'Passed')+"</div><div>"+result.name+"</div></div><div class='clear'></div>"; 
 						html+="<div id='test_detail_"+id+"' style='display:none' class='result "+(result.error?'error':'')+"'>";
 						html+=errorMessage;
 						if (result.error)

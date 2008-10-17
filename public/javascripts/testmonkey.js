@@ -48,6 +48,7 @@
 
 		fireEvent('beforeTestRunner',suites);
 		
+		
 		// we first have to run through them so all the tests can be recorded
 		// they won't run at this point
 		$.each(suites,function()
@@ -170,6 +171,7 @@
 				}
 				default:
 				{
+					
 					break;
 				}
 			}
@@ -263,6 +265,7 @@
 			testcase.failed = true;
 			testcase.error = E;
 			testcase.message = "Exception running testcase: "+E;
+			
 			end(true,false);
 		}
 	}
