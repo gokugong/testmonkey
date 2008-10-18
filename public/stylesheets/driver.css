@@ -26,6 +26,7 @@ h1 span
 	background-color:#CD9B9B; 
 	color:#900;
 	font-weight:bold;
+	margin-right:12px;
 }
 .passed
 {
@@ -35,7 +36,7 @@ h1 span
 }
 span.error
 {
-	padding-left:15px;
+	padding-left:20px;
 	color:#900;
 	font-weight:bold;
 	background-image:url(../images/warning.png);
@@ -48,11 +49,12 @@ span.count
 div.testdetail div
 {
 	float:left;
+	margin-bottom:20px;
+
 }
 div.clear 
 {
 	clear:both;
-	margin-bottom:10px;
 }
 div.testresult
 {
@@ -64,6 +66,8 @@ div.testresult
 div.testdetail
 {
 	cursor:pointer;
+	clear:both;
+	
 }
 div.error_msg
 {
@@ -71,6 +75,8 @@ div.error_msg
 	color:#900;
 	font-weight:bold;
 	background-image:url(images/warning.png);
+	position:relative;
+	top:3px;
 	background-repeat:no-repeat;
 }
 div.result 
@@ -78,6 +84,8 @@ div.result
 	margin:8px;
 	padding:10px;
 	background-color:#eee;
+	margin-top:-5px;
+	margin-bottom:20px;
 }
 div.error span.fn
 {
@@ -88,13 +96,18 @@ div.error span.fn
 div.testsuite
 {
 	font-size:14px;
-	color:#444;
 	font-weight:normal;
-	margin-bottom:10px;
+	min-height:20px;
+	clear:both;
+}
+div.testsuite_name
+{
+	float:left;
+	padding-top:5px;
+	
 }
 div.end_testsuite
 {
-
 }
 #results
 {
@@ -125,7 +138,6 @@ div.intro
 	color:#999;
 	text-align:center;
 }
-
 .testcounts
 {
 	padding:5px;
@@ -143,7 +155,7 @@ div.intro
 {
 	background-color:green;
 	height:15px;
-	width:15px;
+	width:10px;
 	float:left;
 	margin-right:3px;
 	cursor:pointer;
@@ -152,7 +164,7 @@ div.intro
 {
 	background-color:orange;
 	height:15px;
-	width:15px;
+	width:10px;
 	float:left;
 	margin-right:3px;
 	cursor:pointer;
@@ -162,9 +174,59 @@ div.intro
 {
 	background-color:red;
 	height:15px;
-	width:15px;
+	width:10px;
 	float:left;
 	margin-right:3px;
 	cursor:pointer;
 	
+}
+.test_count
+{
+	background-color:#ccc;
+	padding:5px;
+	text-align:center;
+	margin-right:5px;
+	float:left;
+	height:20px;
+	width:20px;
+	line-height:20px;
+	cursor:pointer;
+	
+}
+.passed_count
+{
+	background-color:green;
+	color:white;
+
+}
+.failed_count
+{
+	background-color:orange;
+	color:white;
+}
+.error_count
+{
+	background-color:red;
+	color:white;
+}
+
+div.logs
+{
+	margin-top:20px;
+	white-space: pre;
+	font-size:10px;
+	color:#777;
+}
+div.logs h1
+{
+	font-size:14px;
+	font-weight:bold;
+	margin-bottom:5px;
+	padding-bottom:0;
+}
+#results_table thead
+{
+	border-top:1px solid #ccc;
+	border-bottom:1px solid #ccc;
+	color:#336699;
 }

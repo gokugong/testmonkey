@@ -9796,6 +9796,7 @@ $.fn.toggle = function(params)
 						var currentVal = target.css(p)
 						var opposites = {'inline':'none', 'block':'none','none':'block','hidden':'visible','visible':'hidden'};					
 						var opposite = opposites[currentVal] || '';
+						$.error('opposite = ' + opposite + ' current val '+ currentVal + ' p ' + p);
 						if (currentVal == params[p])
 						{
 							target.css(p,opposite);	
@@ -9854,7 +9855,6 @@ $.fn.destroy = function()
 {
 	var scope = $(this);
 	if (!scope.attr('id')) return this; // we always add id, ignore if we don't have one
-	$.info('destroyed called = '+scope.attr('id'));
 	$.each(this,function()
 	{
 		var el = $(this);

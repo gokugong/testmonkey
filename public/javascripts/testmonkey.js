@@ -1,3 +1,5 @@
+window.TestMonkey = {};
+
 (function(scope,$){
 
 	var testRunnerPlugin = null;
@@ -22,12 +24,18 @@
 		}
 	}
 
-	scope.installTestRunnerPlugin = function(callback)
+	var assertions = {};
+	var currentDescriptor = null, currentSuite = null;
+	
+	TestMonkey.installTestRunnerPlugin = function(callback)
 	{
 		testRunnerPlugin = callback;
 	};
 	
-	var currentDescriptor = null, currentSuite = null;
+	TestMonkey.installAssertionType = function(name,handler)
+	{
+		assertions[name]=handler;
+	};
 	
 	scope.testRunner = function()
 	{
@@ -39,7 +47,7 @@
 		var it = typeof(arguments[0].push)=='function' ? arguments[0] : arguments;
 		$.each(it,function()
 		{
-			var descriptor = testSuitesByName[this];
+			var descriptor = testSuites[this];
 			if (descriptor)
 			{
 				suites.push([this,descriptor]);
@@ -73,14 +81,48 @@
 
 		fireEvent('beforeTestCases',testCases);
 
+		fireEvent('beforeAssertionCount',assertCount);
+		var assertCount = 0;
+		
 		$.each(testCases,function()
 		{
 			var testcase = this;
+			assertCount += testcase.asserts.length;
 			testcase.running = false;
 			testcase.ready = true;
 		});
 		
-		executeNextTestCase();
+		fireEvent('afterAssertionCount',assertCount);
+		
+		var total = 0, loaded = 0;
+
+		// we need to load any pending HTML for the test
+		// and then wait until they're all complete before we 
+		// start running the test cases
+		$.each(suites,function()
+		{
+			var descriptor = this[1];
+			var html = descriptor.html;
+			if (html)
+			{
+				total+=1;
+				loadTestFrame(html,function(id)
+				{
+					// mark the id for the frame onto the descriptor
+					descriptor.htmlID = id;
+					loaded+=1;
+					if (loaded == total)
+					{
+						executeNextTestCase();
+					}
+				});
+			}
+		});
+
+		if (total==0)
+		{
+			executeNextTestCase();
+		}
 	}
 	
 	function executeNextTestCase()
@@ -99,7 +141,12 @@
 		{
 			if (currentSuite!=nextTestCase.suite)
 			{
-				if (currentSuite) fireEvent('afterTestSuite',currentSuite);
+				if (currentSuite)
+				{
+					fireEvent('afterTestSuite',currentSuite);
+					var currentD = testSuites[currentSuite];
+					if (currentD.htmlID) removeTestFrame(currentD.htmlID);
+				}
 				currentSuite = nextTestCase.suite;
 				fireEvent('beforeTestSuite',currentSuite);
 			}
@@ -123,7 +170,12 @@
 		}
 		else
 		{
-			if (currentSuite) fireEvent('afterTestSuite',currentSuite);
+			if (currentSuite)
+			{
+				fireEvent('afterTestSuite',currentSuite);
+				var currentD = testSuites[currentSuite];
+				if (currentD.htmlID) removeTestFrame(currentD.htmlID);
+			}
 			fireEvent('afterTestCases',testCases);
 			fireEvent('afterTestRunner');
 		}
@@ -134,48 +186,101 @@
 		switch(typeof(value))
 		{
 			case 'boolean':
-				return value===true;
+				return [value===true,value];
 			case 'function':
 				value = $.toFunction('(' + String(value) + ')()')();
-				return (value) ? true : false;
+				return [(value ? true : false), value];
 			default:
-				return (value) ? true : false;
+				return [(value ? true : false), value];
 		}
 	}
+	
+	TestMonkey.installAssertionType('',function(testcase,assertion,args)
+	{
+		return runAssertion(args[0]);
+	});
+	
+	TestMonkey.installAssertionType('Visible',function(testcase,assertion,args)
+	{
+		return [this.css('visibility')=='visible',this.css('visibility')];
+	});
+
+	TestMonkey.installAssertionType('Hidden',function(testcase,assertion,args)
+	{
+		return [this.css('visibility')=='hidden',this.css('visibility')];
+	});
+
+	TestMonkey.installAssertionType('Disabled',function(testcase,assertion,args)
+	{
+		return [this.attr('disabled'),this.attr('disabled')];
+	});
+
+	TestMonkey.installAssertionType('Enabled',function(testcase,assertion,args)
+	{
+		return [!this.attr('disabled'),this.attr('disabled')];
+	});
+
+	TestMonkey.installAssertionType('CSS',function(testcase,assertion,args)
+	{
+		return [this.css(args[0]) == args[1],this.css(args[0])];
+	});
+
+	TestMonkey.installAssertionType('Attr',function(testcase,assertion,args)
+	{
+		return [String(this.attr(args[0])) == String(args[1]),String(this.attr(args[0]))];
+	});
+
+	TestMonkey.installAssertionType('Class',function(testcase,assertion,args)
+	{
+		return [this.hasClass(args[0]),this.attr('class')];
+	});
+	
+	TestMonkey.installAssertionType('HTML',function(testcase,assertion,args)
+	{
+		return [this.html()==args[0],this.html()];
+	});
+
+	TestMonkey.installAssertionType('Value',function(testcase,assertion,args)
+	{
+		return [this.val()==args[0],this.val()];
+	});
+
+	TestMonkey.installAssertionType('Text',function(testcase,assertion,args)
+	{
+		return [this.text()==args[0],this.text()];
+	});
+
+	TestMonkey.installAssertionType('Empty',function(testcase,assertion,args)
+	{
+		return [this.text()=='',this.text()];
+	});
+
+	TestMonkey.installAssertionType('Checked',function(testcase,assertion,args)
+	{
+		return [this.get(0).checked,this.get(0).checked];
+	});
+
+	TestMonkey.installAssertionType('Unchecked',function(testcase,assertion,args)
+	{
+		return [!this.get(0).checked,this.get(0).checked];
+	});
 	
 	function internalAssert()
 	{
 		var idx = arguments[0], type = arguments[1]||'';
 		var args = $.makeArray(arguments).splice(2);
-		var result = null;
+		var result = false;
 		var testcase = currentTestCase;
 		var assert = testcase.asserts[idx];
-		var target = this;
 		try
 		{
-			switch(type)
+			var handler = assertions[type];
+			if (handler)
 			{
-				case '':
-				{
-					result = runAssertion(args[0]);
-					break;
-				}
-				case 'Visible':
-				{
-					break;
-				}
-				case 'CSS':
-				{
-					result = target.css(args[0]) == args[1];
-					break;
-				}
-				default:
-				{
-					
-					break;
-				}
+				result = handler.apply(this,[testcase,assert,args]);
 			}
-			testcase.results.push({assert:assert,result:result,idx:idx});
+			var message = result[0] ? null : 'value was "' + result[1] + '" (' + typeof(result[1]) + ')';
+			testcase.results.push({assert:assert,result:result[0],message:message,idx:idx});
 		}
 		catch (E)
 		{
@@ -204,10 +309,23 @@
 				internalAssert.apply(window,arguments);
 			}
 		}
+		function $(selector)
+		{ 
+			return jQuery("#"+descriptor.htmlID).contents().find(selector);
+		}
+		function log(msg)
+		{
+			if (!testcase.logs)
+			{
+				testcase.logs = [];
+			}
+			testcase.logs.push(msg);
+		}
 		function fail(msg)
 		{
 			testcase.message = msg;
 			testcase.explicitFailure = true;
+			testcase.results.push({'result':false,'message':testcase.message});
 			end(true,false);
 		}
 		function end(failed,timeout)
@@ -226,7 +344,7 @@
 			else
 			{
 				var passed = true;
-				$.each(testcase.results,function()
+				jQuery.each(testcase.results,function()
 				{
 					if (!this.result)
 					{
@@ -265,8 +383,9 @@
 			testcase.failed = true;
 			testcase.error = E;
 			testcase.message = "Exception running testcase: "+E;
-			
+			testcase.results.push({'result':false,'error':E,'message':testcase.message});
 			end(true,false);
+			
 		}
 	}
 	
@@ -304,14 +423,46 @@
 		return result;
 	}
 	
+	var testFrameId = 1;
+	
+	function loadTestFrame(url,fn)
+	{
+		var id = '__testdriver_content_'+(testFrameId++);
+		url = URI.absolutizeURI(url,AppC.docRoot+'tests/');
+		$("<iframe id='"+id+"' src='"+url+"' frameborder='0' height='1' width='1' style='position:absolute;left:-100px;top:-10px;'></iframe>").appendTo("body");
+		$('#'+id).load(function()
+		{
+			fn(id);
+		});
+	}
+	
+	function removeTestFrame(id)
+	{
+		// for this frame, we need to drop back to DOM instead of just .remove it seems
+		var el = $("#"+id);
+		if (el.length > 0)
+		{
+			var node = el.get(0);
+			setTimeout(function()
+			{
+				node.parentNode.removeChild(node);
+			},10);
+		}
+	}
+	
+	function escapeString(str)
+	{
+		return $.gsub(str,'"',"\\\"");
+	}
+	
 	function preProcessCode(code)
 	{
-		var re = /assert(.*)?[\s]?\((.*)?\)/;
+		var re = /assert(.*?)[\s]?\((.*)?\)/;
 		var _asserts = [];
 		var newcode = $.gsub(code,re,function(m)
 		{
 			_asserts.push(m[0]); 
-			var prefix = m[1] ? '"' + m[1] + '"' : 'null';
+			var prefix = m[1] ? '"' + escapeString(m[1]) + '"' : 'null';
 			var params = m[2];
 			return 'assertTestCase(' + (_asserts.length-1) + ','+prefix+','+params+')';
 		});
@@ -363,15 +514,20 @@
 		});
 	};
 	
-	var testSuites = [];
-	var testSuitesByName = {};
+	var testSuites = {};
 	
-	scope.testSuite = function(name,descriptor)
+	scope.testSuite = function(name,html,descriptor)
 	{
-		testSuites.push({name:name,descriptor:descriptor});
-		testSuitesByName[name]=descriptor;
+		if (typeof(html)!='string')
+		{
+			descriptor = html;
+			html = null;
+		}
 		
-		fireEvent("addTestSuite",name,descriptor);
+		descriptor.html=html;
+		testSuites[name]=descriptor;
+		
+		fireEvent("addTestSuite",name,descriptor,html);
 		
 		this.run = function()
 		{

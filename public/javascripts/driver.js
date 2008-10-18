@@ -1,5 +1,29 @@
 $(document).ready(function()
 {
+	var testCount = 0;
+	var suiteCount = 0;
+	var cellWidth = 0;
+	var currentAssertion = 0;
+	var currentSuite = 1;
+	
+	var failureCount = 0;
+	var passedCount = 0;
+	var errorCount = 0;
+	
+	var testDetail = [];
+	
+	function resetStats()
+	{
+		testCount = 0;
+		suiteCount = 0;
+		failureCount = 0;
+		passedCount = 0;
+		errorCount = 0;
+		testDetail = [];
+		$('#status_bar').empty();
+		$("#results").empty();
+		
+	}
 	$.getJSON(AppC.docRoot+'tests/manifest.js',function(json)
 	{
 		$.each(json.suites,function()
@@ -8,15 +32,19 @@ $(document).ready(function()
 		});
 	});
 	
+	
 	$("#run").on("click",function()
 	{
-		$("#results").empty();
+		resetStats();
+		$('#test_summary_title').show();
 		testRunner($("#selector select").val());
+		
 	});
 
 	$("#runall").on("click",function()
 	{
-		$("#results").empty();
+		resetStats();
+		$('#test_summary_title').show();
 		var select = $("#selector select").get(0);
 		var tests = [];
 		for (var c=0;c<select.length;c++)
@@ -44,12 +72,7 @@ $(document).ready(function()
 	}
 	
 	var idCounter = 1;
-	var testCount = 0;
-	var suiteCount = 0;
-	var assertCount = 0;
-	
-	installTestRunnerPlugin({
-		
+	TestMonkey.installTestRunnerPlugin({
 		onEvent: function(name,result)
 		{
 			switch(name)
@@ -61,32 +84,135 @@ $(document).ready(function()
 				}
 				case 'beforeTestSuite':
 				{
-					$("#results").append("<table><thead><td>Suite</td><td>Passed</td><td>Failed</td><td>Errors</td></thead><tr><td><div class='testsuite'>"+result+"</div></td>");
+					break;
+				}
+				case 'afterAssertionCount':
+				{
+					// set assertion count total
+					$('#assert_count').html(result)
+					
+					// display
+					$('#summary').css('display','block')
+					
+					// reset 
+					$('#status_bar').empty();
+					currentAssertion = 0;
+					currentSuite  = 1;
+					
+					// calculate cell width and pre-populate
+					var width = $('#status_bar').width();
+					var totalCellWidth = (width -20) /result;
+					cellWidth = totalCellWidth - 5;
+
+					for (var i=0;i<result;i++)
+					{
+						$('#status_bar').append('<div id="assert_bar_'+i+'" style="float:left;background-color:#ccc;margin-left:5px;height:15px;width:'+cellWidth+'px"></div>');
+					}
 					break;
 				}
 				case 'beforeTestRunner':
 				{
-					suiteCount = result.length;
+					suiteCount = result.length;					
 					$('#suite_count').html(suiteCount);
+					for (var i=0;i<suiteCount;i++)
+					{
+						$("#results").append("<div id='testsuite_"+ (i+1) +"' class='testsuite'><div class='test_count' id='passed_count_" + (i+1) + "'>0</div><div class='test_count' id='failed_count_" + (i+1) + "'>0</div><div class='test_count' id='error_count_" + (i+1) + "'>0</div><div class='testsuite_name'><a href='#' id='testsuite_detail_link_"+(i+1)+"'>"+result[i][0]+"</a></div><div style='clear:both;padding-top:20px;' id='testsuite_detail_"+(i+1)+"'><div id='testsuite_detail_error_"+(i+1)+"' style='display:none'></div><div id='testsuite_detail_failed_"+(i+1)+"' style='display:none'></div><div id='testsuite_detail_passed_"+(i+1)+"' style='display:none;'></div><div id='testsuite_detail_all_"+(i+1)+"' style='display:none;'></div></div></div>");						
+
+						$('#testsuite_detail_link_' + (i+1)).click(function()
+						{
+							var suite = this.id.substring(this.id.length-1)
+							var el = $('#testsuite_detail_all_' + suite);
+							var errorDiv = $('#testsuite_detail_error_' + suite);
+							var failedDiv = $('#testsuite_detail_failed_' + suite);
+							var passedDiv = $('#testsuite_detail_passed_' + suite);
+							if (el.css('display') == 'block') 
+							{
+								el.slideUp() 
+							}
+							else
+							{
+								el.slideDown();
+								errorDiv.slideUp();
+								failedDiv.slideUp();
+								passedDiv.slideUp();
+							} 
+						});
+
+						$('#passed_count_' + (i+1)).click(function()
+						{
+							var suite = this.id.substring(this.id.length-1)
+							var el = $('#testsuite_detail_passed_' + suite);
+							var errorDiv = $('#testsuite_detail_error_' + suite);
+							var failedDiv = $('#testsuite_detail_failed_' + suite);
+							var all = $('#testsuite_detail_all_' + suite);
+							if (el.css('display') == 'block') 
+							{
+								el.slideUp() 
+							}
+							else
+							{
+								el.slideDown();
+								errorDiv.slideUp();
+								failedDiv.slideUp();
+								all.slideUp();
+							} 
+						});
+						$('#failed_count_' + (i+1)).click(function()
+						{
+							var suite = this.id.substring(this.id.length-1)
+							var el = $('#testsuite_detail_failed_' + suite);
+							var errorDiv = $('#testsuite_detail_error_' + suite);
+							var passedDiv = $('#testsuite_detail_passed_' + suite);
+							var all = $('#testsuite_detail_all_' + suite);
+							if (el.css('display') == 'block') 
+							{
+								el.slideUp() 
+							}
+							else
+							{
+								el.slideDown();
+								errorDiv.slideUp();
+								passedDiv.slideUp();
+								all.slideUp();
+							} 
+
+						});
+						$('#error_count_' + (i+1)).click(function()
+						{
+							var suite = this.id.substring(this.id.length-1)
+							var el = $('#testsuite_detail_error_' + suite);
+							var passedDiv = $('#testsuite_detail_passed_' + suite);
+							var failedDiv = $('#testsuite_detail_failed_' + suite);
+							var all = $('#testsuite_detail_all_' + suite);				
+							if (el.css('display') == 'block') 
+							{
+								el.slideUp() 
+							}
+							else
+							{
+								el.slideDown();
+								failedDiv.slideUp();
+								passedDiv.slideUp();
+								all.slideUp();
+							} 
+
+						});
+					}
 					break;
 				}
 				case 'beforeTestCases':
 				{
 					testCount = result.length;
 					$('#test_count').html(result.length);
-					$('#summary').css('display','block')
-					break;
-				}
-				case 'beforeTestCase':
-				{
-					assertCount +=result.asserts.length;
-					$('#assert_count').html(assertCount)
-
 					break;
 				}
 				case 'afterTestSuite':
 				{
-					$("#results").append("</tr>");
+					currentSuite++;
+					failureCount = 0;
+					passedCount = 0;
+					errorCount = 0;
+					
 					break;
 				}
 				case 'afterTestCase':
@@ -95,28 +221,30 @@ $(document).ready(function()
 					{
 						var errorMessage = result.testcase;
 						var failedCount = 0;
-						$.info('result.results ' + result.results)
 						$.each(result.results,function()
-						{
+						{							
 							failedCount +=this.result ? 0 : 1;
 							var cls = this.result ? 'passed' : 'failed';
-							
 							var idx = errorMessage.indexOf(this.assert);
-							$.info('error ' +this.error)
-
 							if (this.error)
 							{
-								$('#status_bar').append('<div class="error_bar"></div>');
+								errorCount++;
+								$('#error_count_'+currentSuite).html(errorCount).addClass('error_count');				
+								$('#assert_bar_' + currentAssertion).css('background-color','red');
 							}
 							else if (cls=='passed')
 							{
-								$('#status_bar').append('<div class="passed_bar"></div>');
+								passedCount++
+								$('#passed_count_'+currentSuite).html(passedCount).addClass('passed_count');
+								$('#assert_bar_' + currentAssertion).css('background-color','green');
 							}
 							else 
 							{
-								$('#status_bar').append('<div class="failed_bar"></div>');								
+								failureCount++
+								$('#failed_count_'+currentSuite).html(failureCount).addClass('failed_count');
+								$('#assert_bar_' + currentAssertion).css('background-color','orange');
 							}
-
+							currentAssertion++;
 							if (idx != -1)
 							{
 								var newMessage = errorMessage.substring(0,idx);
@@ -172,15 +300,32 @@ $(document).ready(function()
 							errorMessage = 'test("' + result.name + '",<span class="fn">'+errorMessage+'</span>);'
 						}
 						var id = idCounter++;
-						var html = "<div style='display:none' class='testdetail' id='test_"+id+"'><div class='testresult "+(result.failed?'failed':'passed')+"'>"+(result.error ? 'Error' : result.failed?('Failed <span class="count">('+failedCount+')</span>'):'Passed')+"</div><div>"+result.name+"</div></div><div class='clear'></div>"; 
+						var html = "<div class='testdetail' id='test_"+id+"'><div class='testresult "+(result.failed?'failed':'passed')+"'>"+(result.error ? 'Error' : result.failed?('Failed <span class="count">('+failedCount+')</span>'):'Passed')+"</div><div>"+result.name+"</div></div><div class='clear'></div>"; 
 						html+="<div id='test_detail_"+id+"' style='display:none' class='result "+(result.error?'error':'')+"'>";
 						html+=errorMessage;
 						if (result.error)
 						{
 							html+="<div class='error_msg'>" + result.error + "</div>";
 						}
+						if (result.logs)
+						{
+							html+="<div class='logs'><h1>Test log results:</h1>" + result.logs.join("\n") + "</div>";
+						}
 						html+="</div>";
-						$("#results").append(html);
+						
+						$('#testsuite_detail_all_'+currentSuite).append(html)
+						if (result.error)
+						{
+							$('#testsuite_detail_error_' + currentSuite).append(html)
+						}
+						else if (result.failed)
+						{
+							$('#testsuite_detail_failed_' + currentSuite).append(html)						
+						}
+						else
+						{
+							$('#testsuite_detail_passed_' + currentSuite).append(html)							
+						}
 						$("#test_"+id).click(function()
 						{
 							var t = $("#test_detail_"+id);

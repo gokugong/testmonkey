@@ -6,13 +6,11 @@ testSuite("Set of tests for Test Monkey",
 		{
 			assert( 1 + 1 == 2);
 			assert(true);
-			$('body').assertCSS('visibility','visible');
 		});
 		testAsync("test with explicit failure",1000,function()
 		{
 			assert( 1 + 1 == 2);
 			assert(true);
-			$('body').assertCSS('visibility','visible');
 			fail("this is a message")
 		});
 		testAsync("test to show multiple assert failures",1000,function()
