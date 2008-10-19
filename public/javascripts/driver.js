@@ -3,14 +3,15 @@ $(document).ready(function()
 	var testCount = 0;
 	var suiteCount = 0;
 	var cellWidth = 0;
+	
+	// processing vars
 	var currentAssertion = 0;
 	var currentSuite = 1;
 	
+	// counts
 	var failureCount = 0;
 	var passedCount = 0;
 	var errorCount = 0;
-	
-	var testDetail = [];
 	
 	function resetStats()
 	{
@@ -19,7 +20,7 @@ $(document).ready(function()
 		failureCount = 0;
 		passedCount = 0;
 		errorCount = 0;
-		testDetail = [];
+		
 		$('#status_bar').empty();
 		$("#results").empty();
 		
@@ -110,6 +111,15 @@ $(document).ready(function()
 					}
 					break;
 				}
+				case 'afterTestRunner':
+				{
+					$(".testdetail").click(function()
+					{
+						var child = $(this).children('.result');
+						$(child).css('display') == 'none' ? $(child).slideDown() : $(child).slideUp();
+					});
+					
+				}
 				case 'beforeTestRunner':
 				{
 					suiteCount = result.length;					
@@ -147,7 +157,7 @@ $(document).ready(function()
 							var all = $('#testsuite_detail_all_' + suite);
 							if (el.css('display') == 'block') 
 							{
-								el.slideUp() 
+								el.slideUp(); 
 							}
 							else
 							{
@@ -166,7 +176,7 @@ $(document).ready(function()
 							var all = $('#testsuite_detail_all_' + suite);
 							if (el.css('display') == 'block') 
 							{
-								el.slideUp() 
+								el.slideUp(); 
 							}
 							else
 							{
@@ -300,8 +310,8 @@ $(document).ready(function()
 							errorMessage = 'test("' + result.name + '",<span class="fn">'+errorMessage+'</span>);'
 						}
 						var id = idCounter++;
-						var html = "<div class='testdetail' id='test_"+id+"'><div class='testresult "+(result.failed?'failed':'passed')+"'>"+(result.error ? 'Error' : result.failed?('Failed <span class="count">('+failedCount+')</span>'):'Passed')+"</div><div>"+result.name+"</div></div><div class='clear'></div>"; 
-						html+="<div id='test_detail_"+id+"' style='display:none' class='result "+(result.error?'error':'')+"'>";
+						var html = "<div class='testdetail'><div class='testresult "+(result.failed?'failed':'passed')+"'>"+(result.error ? 'Error' : result.failed?('Failed <span class="count">('+failedCount+')</span>'):'Passed')+"</div><div>"+result.name+"</div><div class='clear'></div>"; 
+						html+="<div  style='display:none' class='result "+(result.error?'error':'')+"'>";
 						html+=errorMessage;
 						if (result.error)
 						{
@@ -311,8 +321,8 @@ $(document).ready(function()
 						{
 							html+="<div class='logs'><h1>Test log results:</h1>" + result.logs.join("\n") + "</div>";
 						}
-						html+="</div>";
-						
+						html+="</div></div>";
+
 						$('#testsuite_detail_all_'+currentSuite).append(html)
 						if (result.error)
 						{
@@ -320,17 +330,12 @@ $(document).ready(function()
 						}
 						else if (result.failed)
 						{
-							$('#testsuite_detail_failed_' + currentSuite).append(html)						
+							$('#testsuite_detail_failed_' + currentSuite).append(html)
 						}
 						else
 						{
 							$('#testsuite_detail_passed_' + currentSuite).append(html)							
 						}
-						$("#test_"+id).click(function()
-						{
-							var t = $("#test_detail_"+id);
-							t.css('display') == 'none' ? t.css("display","block") : t.css("display","none");
-						});
 					}
 					catch (E)
 					{
