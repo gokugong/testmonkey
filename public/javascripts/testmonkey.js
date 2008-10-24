@@ -154,7 +154,6 @@ window.TestMonkey = {};
 			var testcase = nextTestCase;
 			fireEvent('beforeTestCase',testcase);
 			var descriptor = testcase.descriptor;
-			if (descriptor.setup) try { descriptor.setup(); } catch (E) {}
 			var error = false;
 			try
 			{
@@ -302,80 +301,140 @@ window.TestMonkey = {};
 		testcase.running = true;
 		currentTestCase = testcase;
 		var timer = null;
-		function assertTestCase()
+		window.testScope = function()
 		{
-			if (testcase.running)
+			var self = this;
+			this.descriptor = descriptor;
+			this.$ = function(selector)
 			{
-				internalAssert.apply(window,arguments);
+				return jQuery("#"+descriptor.htmlID).contents().find(selector);				
 			}
-		}
-		function $(selector)
-		{ 
-			return jQuery("#"+descriptor.htmlID).contents().find(selector);
-		}
-		function log(msg)
-		{
-			if (!testcase.logs)
+			this.setup = function()
 			{
-				testcase.logs = [];
+				if (descriptor.setup) try { descriptor.setup(); } catch (E) {}
 			}
-			testcase.logs.push(msg);
-		}
-		function fail(msg)
-		{
-			testcase.message = msg;
-			testcase.explicitFailure = true;
-			testcase.results.push({'result':false,'message':testcase.message});
-			end(true,false);
-		}
-		function end(failed,timeout)
-		{
-			if (!testcase.running) return;
-			if (timer)
+			this.teardown = function()
 			{
-				clearTimeout(timer);
-				timer=null;
+				if (descriptor.teardown) try { descriptor.teardown(); } catch (E) {}
 			}
-			testcase.running = false;
-			if (failed)
+			this.assertTestCase=function()
+			{
+				if (testcase.running)
+				{
+					internalAssert.apply(window,arguments);
+				}
+			}
+			this.log=function(msg)
+			{
+				if (!testcase.logs)
+				{
+					testcase.logs = [];
+				}
+				testcase.logs.push(msg);
+			}
+			this.error = function(E)
 			{
 				testcase.failed = true;
+				testcase.error = E;
+				testcase.message = "Exception running testcase: "+E;
+				testcase.results.push({'result':false,'error':E,'message':testcase.message});
+				self.end(true,false);
 			}
-			else
+			this.fail=function(msg)
 			{
-				var passed = true;
-				jQuery.each(testcase.results,function()
+				testcase.message = msg;
+				testcase.explicitFailure = true;
+				testcase.results.push({'result':false,'message':testcase.message});
+				self.end(true,false);
+			}
+			this.end=function(failed,timeout)
+			{
+				if (!testcase.running) return;
+				if (timer)
 				{
-					if (!this.result)
+					clearTimeout(timer);
+					timer=null;
+				}
+				testcase.running = false;
+				if (failed)
+				{
+					testcase.failed = true;
+				}
+				else
+				{
+					var passed = true;
+					jQuery.each(testcase.results,function()
 					{
-						passed=false;
-						return false;
-					}
-				});
-				testcase.failed = !passed;
-				if (passed && !testcase.message) testcase.message ="Assertions Passed";
-				if (!passed && !testcase.message) testcase.message = "Assertion Failures";
+						if (!this.result)
+						{
+							passed=false;
+							return false;
+						}
+					});
+					testcase.failed = !passed;
+					if (passed && !testcase.message) testcase.message ="Assertions Passed";
+					if (!passed && !testcase.message) testcase.message = "Assertion Failures";
+				}
+				if (timeout)
+				{
+					testcase.timeout = true;
+					testcase.message = "Timed out";
+					testcase.results.push({'result':false,'message':testcase.message});
+				}
+				fireEvent('afterTestCase',testcase,descriptor);
+				executeNextTestCase();
 			}
-			if (timeout)
-			{
-				testcase.timeout = true;
-				testcase.message = "Timed out";
-			}
-			if (descriptor.teardown) try { descriptor.teardown(); } catch (E) {}
-			fireEvent('afterTestCase',testcase,descriptor);
-			executeNextTestCase();
 		}
+		var t = new window.testScope;
 		try
 		{
-			var f = eval('('+testcase.code+')');
-			f.call(descriptor);
-			if (typeof(testcase.timeout)=='undefined')
+			
+			var code="var scope = parent ? new parent.window.testScope : window.testScope;\n";
+			code+="var jq = typeof(jQuery)=='undefined' ? scope.$ : jQuery;\n";
+			code+="try {\n";
+			code+= "(function($){\n";
+			code+="function log() { return scope.log.apply(this,arguments) }\n";
+			code+="function end() { return scope.end.apply(this,arguments) }\n";
+			code+="function fail() { return scope.fail.apply(this,arguments) }\n";
+			code+="function error() { return scope.error.apply(this,arguments) }\n";
+			code+="function assertTestCase() { return scope.assertTestCase.apply(this,arguments) }\n";
+			code+="scope.setup.call(scope.descriptor);\n";
+			code+='('+testcase.code+').call(scope.descriptor);\n';
+			code+='\n})(jq);\n';
+			code+="}catch(E){\n";
+			code+="scope.error(E);\n";
+			code+="}\n";
+			code+="scope.teardown.call(scope.descriptor);\n";
+			
+			var head = jQuery("#"+descriptor.htmlID).contents().find("body").get(0);
+
+			if (!head)
 			{
-				end(false,false);
+				// in this case, they didn't load up any iframe - we need to dynamically create one (for test cases that don't specify html)
+				jQuery("<iframe style='position:absolute;left:-10px;top:-10px;height:1px;width:1px;' id='" + descriptor.htmlID+"'></iframe>").appendTo("body");
+				head = jQuery("#"+descriptor.htmlID).contents().find("body").get(0);
+			}
+
+			var script = head.ownerDocument.createElement('script');
+			script.type = "text/javascript";
+			if ( jQuery.browser.msie )
+			{
+				script.text = code;
 			}
 			else
 			{
-				timer=setTimeout(function(){end(true,true)},testcase.timeout);
+				script.appendChild( document.createTextNode( code ) );
+			}
+
+			head.appendChild(script);
+			
+			if (typeof(testcase.timeout)=='undefined')
+			{
+				t.end(false,false);
+			}
+			else
+			{
+				timer=setTimeout(function(){t.end(true,true)},testcase.timeout);
 			}
 		}
 		catch(E)
@@ -384,8 +443,7 @@ window.TestMonkey = {};
 			testcase.error = E;
 			testcase.message = "Exception running testcase: "+E;
 			testcase.results.push({'result':false,'error':E,'message':testcase.message});
-			end(true,false);
-			
+			t.end(true,false);
 		}
 	}
 	

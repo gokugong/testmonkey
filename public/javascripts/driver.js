@@ -118,7 +118,7 @@ $(document).ready(function()
 						var child = $(this).children('.result');
 						$(child).css('display') == 'none' ? $(child).slideDown() : $(child).slideUp();
 					});
-					
+					break;
 				}
 				case 'beforeTestRunner':
 				{

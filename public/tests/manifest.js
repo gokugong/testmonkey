@@ -3,6 +3,7 @@
 		"example/example.js",
 		"example/example2.js",
 		"example/example3.js",
-		"example/example4.js"
+		"example/example4.js",
+		"example/example5.js"
 	]
 } 
