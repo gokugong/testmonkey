@@ -1,7 +1,7 @@
 /*!(c) 2006-2008 Appcelerator, Inc. http://appcelerator.org
  * Licensed under the Apache License, Version 2.0. Please visit
  * http://license.appcelerator.com for full copy of the License.
- * Version: 3.0.0, Released: 10/22/2008
+ * Version: 3.0.0, Released: 10/24/2008
  **/
 
 /*- The following file(s) are subject to license agreements by their respective license owners. Ends at text: END THIRD PARTY SOURCE */
@@ -3843,7 +3843,7 @@ AppC.Version =
 	major: parseInt('3'),
 	minor: parseInt('0'),
 	revision: parseInt('0'),
-	date: '10/22/2008',
+	date: '10/24/2008',
 	toString:function()
 	{
 		return this.value;
@@ -3858,21 +3858,6 @@ AppC.LicenseType = 'Apache License Version 2.0 - see http://license.appcelerator
 AppC.Copyright = 'Copyright (c) 2006-'+(1900+started.getYear())+' by Appcelerator, Inc. All Rights Reserved.';
 AppC.LicenseMessage = 'Appcelerator is licensed under ' + AppC.LicenseType;
 
-
-var docRoot;
-var idx = top.window.document.location.href.lastIndexOf('/');
-if (idx == top.window.document.location.href.length - 1)
-{
-	docRoot = top.window.document.location.href;
-}
-else
-{
-    docRoot  = top.window.document.location.href.substr(0, idx);
-    if (docRoot.substring(docRoot.length - 1) != '/')
-    {
-        docRoot  = docRoot + '/';
-    }
-}
 
 //
 // these are parameters that can be set by the developer to customize appcelerator based on app needs
@@ -3927,64 +3912,71 @@ function queryString(uri,params)
 	return params;
 }
 
+
 // get config parameters for app from the URI of the page
 queryString(top.window.document.location.href,AppC.params);
 
-AppC.docRoot = docRoot;
+var removeLastElement = function(uri) {
+    var idx = uri.lastIndexOf('/');
+    if (idx != 1)
+    {
+        uri = uri.substring(0, idx) + "/";
+    }
+    return uri;
+}
 
-var absRe = /file:|http(s)?:/
+// top is important such that if the JS file is in a different location (hosted)
+// than the primary document, we use the primary document's path (cross site scripting)
+var documentRoot = removeLastElement(top.window.document.location.href);
 
+// get appcelerator.js and base paths
+// and ensure these uris are absolute
 var jsLocation = $('script[@src~=appcelerator]').get(0).src;
 var baseLocation = $('base[@href]').attr('href');
+baseLocation = baseLocation ? URI.absolutizeURI(baseLocation, documentRoot) : "";
+jsLocation = jsLocation ? URI.absolutizeURI(jsLocation, documentRoot) : "";
 
-if (baseLocation)
+if (jsLocation)
 {
-	AppC.docRoot = baseLocation;
+    AppC.sdkRoot = removeLastElement(jsLocation); // parent directory of js
+    var docHost = URI.splitUriRef(documentRoot)[1];
+    var jsHost = URI.splitUriRef(jsLocation)[1];
+
+    // we need to know where appcelerator.xml is located
+    if (docHost == jsHost) // locally hosted
+    {
+        AppC.docRoot = URI.absolutizeURI(".", AppC.sdkRoot + "..");
+    }
+    else if (docHost != jsHost && baseLocation) // remote js -- use base location
+    {
+        AppC.docRoot = baseLocation;
+    }
+    else
+    {
+        AppC.docRoot = URI.absolutizeURI(".", documentRoot);
+    }
+}
+else
+{
+    console.error("Can't find appcelerator.js or appcelerator-debug.js");
 }
 
-if (!absRe.test(jsLocation))
+// add a slash if the path is missing one
+if (!AppC.sdkRoot.charAt(AppC.sdkRoot.length - 1) == '/')
 {
-	jsLocation = AppC.docRoot + (jsLocation.charAt(0)=='/' ? jsLocation.substring(1) : jsLocation);
+    AppC.sdkRoot += '/'; 
 }
+if (!AppC.docRoot.charAt(AppC.docRoot.length - 1) == '/')
+{
+    AppC.docRoot += '/'; 
+}
+
+AppC.compRoot = AppC.sdkRoot + 'components/';
+AppC.pluginRoot = AppC.sdkRoot + 'plugins/';
 
 // override the configuration for appcelerator from the appcelerator JS query string
-queryString(jsLocation,AppC.config);
+queryString(jsLocation, AppC.config);
 
-if (!baseLocation)
-{
-	// see if it's a full URI
-	var hostIdx = jsLocation.indexOf(':/');
-	if (hostIdx > 0)
-	{
-		var jsHostPath = jsLocation.substring(hostIdx + 3, jsLocation.indexOf('/',hostIdx + 4));
-		var docIdx = AppC.docRoot.indexOf(':/');
-		if (docIdx > 0)
-		{
-			var docHostPath = AppC.docRoot.substring(docIdx + 3, AppC.docRoot.indexOf('/',docIdx+4));
-			if (docHostPath == jsHostPath)
-			{
-				// if on the same host then always prefer the JS location (one directory up) as the base href
-				// such that we can have multiple content directories that include the JS relatively from the top
-				AppC.docRoot = URI.absolutizeURI(jsLocation.substring(0,jsLocation.lastIndexOf('/')) + '/../',AppC.docRoot);
-			}
-		}
-	}
-	else
-	{
-		// relative URI we need to adjust the DocumentPath
-		if (jsLocation.charAt(0)=='/' || jsLocation.charAt(0)=='.')
-		{
-			var idx = jsLocation.lastIndexOf('/');
-			if (idx!=-1)
-			{
-				AppC.docRoot = URI.absolutizeURI(jsLocation.substring(0,idx+1) + '../',AppC.docRoot);
-			}
-		}
-	}
-}
-
-AppC.compRoot = AppC.docRoot + 'components/';
-AppC.pluginRoot = AppC.compRoot + 'plugins/';
 
 var appid = 0;
 
@@ -4158,11 +4150,14 @@ AppC.compileDocument = function()
 		compileFinished = new Date;
 		loadTime = compileFinished - started;
 		compileTime = compileFinished - compileStarted;
-	
-		$.info(AppC.Copyright);
-		$.info(AppC.LicenseMessage);
-		$.info('loaded in ' + (loadTime) + ' ms, compiler took ~'+(compileTime)+' ms');
-		$.info('Appcelerator is ready!');
+		
+		if (top.window === window)
+		{
+			$.info(AppC.Copyright);
+			$.info(AppC.LicenseMessage);
+			$.info('loaded in ' + (loadTime) + ' ms, compiler took ~'+(compileTime)+' ms');
+			$.info('Appcelerator is ready!');
+		}
 	});
 	
 	var s = new state(body);
@@ -4299,6 +4294,14 @@ $.extend(
 			}
 		}
 		return array;
+	},
+	escapeHTML: function(value)
+	{
+		// idea from prototype
+		var div = document.createElement('div');
+		var text = document.createTextNode(value);
+		div.appendChild(text);
+		return div.innerHTML;
 	},
 	escapeXML: function(value)
 	{
@@ -4839,7 +4842,8 @@ function getTarget(params,t)
 	{
 		return $(params.target)
 	}
-	return (params.id)?$("#" + params.id):t;
+	var nt = params.id ? $('#'+params.id) : null;
+	return nt && nt.length > 0 ? nt : t;
 }
 
 function regCSSAction(name,key,value)
@@ -5059,6 +5063,15 @@ App.invokeAction=function(name,data,params)
 	}
 };
 
+App.triggerElseAction = function(scope,params,meta)
+{
+	App.triggerAction(scope,params,
+	{
+		action: meta.elseAction,
+		actionParams: meta.elseActionParams,
+		delay:0
+	});
+};
 App.triggerAction = function(scope,params,meta)
 {
 	var data = meta.actionParams;
@@ -6540,6 +6553,79 @@ $.fn.cookie = $.cookie;
 
 //--------------------------------------------------------------------------------
 
+/* trash.js */
+
+$.fn.trash = function(fn)
+{
+	var trash = this.data('trash');
+	if (!trash)
+	{
+		trash = [];
+		this.data('trash',trash);
+	}
+	if (arguments.length == 0 || typeof(fn)=='undefined')
+	{
+		return trash;
+	}
+	trash.push(fn);
+	return this;
+};
+
+$.fn.destroy = function()
+{
+	var scope = $(this);
+	if (!scope.attr('id')) return this; // we always add id, ignore if we don't have one
+	$.each(this,function()
+	{
+		var el = $(this);
+		var trash = el.trash();
+		if (trash && trash.length > 0)
+		{
+			$.each(trash,function()
+			{
+				try { this.call(scope) } catch (E) { } 
+			});
+			el.trigger('destroyed');
+		}
+		el.removeData('trash');
+	});
+	return this;
+};
+
+var oldEmpty = $.fn.empty;
+
+// remap to make sure we destroy
+$.fn.empty = function()
+{
+	var el = $(this).get(0);
+	if (el)
+	{
+		var set = getTargetCompileSet(el,true);
+		$.each(set,function()
+		{
+			$(this).destroy();
+		});
+	}
+	return oldEmpty.apply(this,arguments);
+};
+
+var oldRemove = $.fn.remove;
+
+// // remap to make sure we destroy
+// $.fn.remove = function()
+// {
+// 	$.each(this,function()
+// 	{
+// 		var scope = $(this);
+// 		scope.destroy();
+// 		oldRemove.call(scope);
+// 	});
+// 	return this;
+// };
+
+
+//--------------------------------------------------------------------------------
+
 /* img.js */
 
 App.reg('srcexpr','img',function(params)
@@ -7191,7 +7277,7 @@ function createControl(el,name,opts,fn)
 
 function load(type,name,e)
 {
-	var uri = AppC.docRoot + 'components/'+type+'s/'+name+'/'+name+'.js';
+	var uri = AppC.sdkPath + 'components/'+type+'s/'+name+'/'+name+'.js';
 	$.getScript(uri);
 }
 
@@ -7647,8 +7733,15 @@ $.fn.add = function(prop,value)
 	}
 };
 
-$.fn.remove = function(prop)
+var currentRemoveFn = $.fn.remove;
+
+$.fn.remove = function(prop,value)
 {
+	if (!prop)
+	{
+		return currentRemoveFn.apply(this,arguments);
+	}
+	
 	$.each(this,function()
 	{
 		switch(prop)
@@ -7656,12 +7749,19 @@ $.fn.remove = function(prop)
 			case 'class':
 			case 'className':
 			{
-				$(this).removeClass(prop);
+				$(this).removeClass(value);
 				break;
 			}
 			default:
 			{
-				$(this).removeAttr(prop);
+				if ($(prop).length == 0)
+				{
+					$(this).removeAttr(prop);			
+				}
+				else
+				{
+					currentRemoveFn.apply(this, arguments);
+				}
 			}
 		}
 	});
@@ -7943,7 +8043,7 @@ function installDecorator(el,target)
 {
 	if (!target)
 	{
-		var img = AppC.docRoot + 'images/exclamation.png';
+		var img = AppC.sdkRoot + 'images/exclamation.png';
 		var id = el.attr('id') + '_decorator';
 		var html = '<span id="'+id+'" class="decorator"><img src="' + img + '"/></span>';
 		el.after(html);
@@ -8574,7 +8674,7 @@ var bundles = {};
 //
 // the path of the bundle is:
 //
-// AppC.docRoot + 'localization/' + locale.properties
+// AppC.sdkPath + 'localization/' + locale.properties
 //
 // will attempt to load specific locale is fully specified (such as en-UK)
 // and will attempt to fall back to short version (such as en) if not found
@@ -8590,7 +8690,7 @@ AppC.locale = function(lang)
 	{
 		try
 		{
-			var url = AppC.docRoot + 'localization/' + lang.toLowerCase() + '.properties';
+			var url = AppC.sdkPath + 'localization/' + lang.toLowerCase() + '.properties';
 			$.debug('attempting to fetch '+url);
 
 			$.ajax({
@@ -8815,11 +8915,14 @@ var processingQueue = false;
 
 $.fn.sub = function(name,fn,params)
 {
-	name = App.normalizePub(name);
+	var p = App.extractParameters(name);
+	params = params || p.params;
+	name = App.normalizePub(p.name);
+
 	var regexp = null;
 	var m = re.exec(name);
 	var type = m[2];
-
+	
 	if (type.charAt(0)=='~')
 	{
 		type = type.substring(1);
@@ -8946,14 +9049,22 @@ $(document).bind('compiled',function()
 
 App.regCond(re,function(meta)
 {
-	$(this).sub(meta.cond,function(data)
+	$(this).sub(meta.cond,function(data,scope,version,name,direction,params)
 	{
-		App.triggerAction(this,data,meta);
+		if (App.parseConditionCondition(params,data))
+		{
+			App.triggerAction(this,data,meta);
+		}
+		else
+		{
+			App.triggerElseAction(this,data,meta);
+		}
 	});
 });
 
 App.regAction(/^(l|local|both|\*|r|remote)\:/,function(params,action)
 {
+	// TODO: parse our params from action
 	$(this).pub(action,params);
 });
 
@@ -9111,8 +9222,8 @@ function processQueue()
 		var a = queue[i].local ? subs.local : subs.remote;
 		var name = queue[i].name;
 		var data = queue[i].data;
-		var scope = queue[i].scope;
-		var version = queue[i].version;
+		var scope = queue[i].scope || 'appcelerator';
+		var version = queue[i].version || '1.0';
 		var direction = queue[i].local ? 'local' : 'remote';
 		
 		// process subs
@@ -9120,10 +9231,7 @@ function processQueue()
 		{
 			if ((a[j].regexp && a[j].regexp.test(name)) || (!a[j].regexp && a[j].name == name))
 			{
-				if (App.parseConditionCondition(a[j].params,data))
-				{
-					a[j].fn.apply(a[j].scope,[data,scope,version,name,direction]);
-				}
+				a[j].fn.apply(a[j].scope,[data,scope,version,name,direction,a[j].params]);
 			}
 		}
 	}
@@ -10099,85 +10207,11 @@ $.fn.toggle = function(params)
 
 //--------------------------------------------------------------------------------
 
-/* trash.js */
-
-$.fn.trash = function(fn)
-{
-	var trash = this.data('trash');
-	if (!trash)
-	{
-		trash = [];
-		this.data('trash',trash);
-	}
-	if (arguments.length == 0 || typeof(fn)=='undefined')
-	{
-		return trash;
-	}
-	trash.push(fn);
-	return this;
-};
-
-$.fn.destroy = function()
-{
-	var scope = $(this);
-	if (!scope.attr('id')) return this; // we always add id, ignore if we don't have one
-	$.info('destroyed called = '+scope.attr('id'));
-	$.each(this,function()
-	{
-		var el = $(this);
-		var trash = el.trash();
-		if (trash && trash.length > 0)
-		{
-			$.each(trash,function()
-			{
-				try { this.call(scope) } catch (E) { } 
-			});
-			el.trigger('destroyed');
-		}
-		el.removeData('trash');
-	});
-	return this;
-};
-
-var oldEmpty = $.fn.empty;
-
-// remap to make sure we destroy
-$.fn.empty = function()
-{
-	var el = $(this).get(0);
-	if (el)
-	{
-		var set = getTargetCompileSet(el,true);
-		$.each(set,function()
-		{
-			$(this).destroy();
-		});
-	}
-	return oldEmpty.apply(this,arguments);
-};
-
-var oldRemove = $.fn.remove;
-
-// remap to make sure we destroy
-$.fn.remove = function()
-{
-	$.each(this,function()
-	{
-		var scope = $(this);
-		scope.destroy();
-		oldRemove.call(scope);
-	});
-	return this;
-};
-
-
-//--------------------------------------------------------------------------------
-
 /* value.js */
 
 $.fn.value = function(object,property,defValue)
 {
-	var value = $.getNestedProperty(object,property,defValue);
+	var value = $.getNestedProperty(object,property,defValue||property);
 	
 	if (this.is(':input'))
 	{
