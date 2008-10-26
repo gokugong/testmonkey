@@ -295,6 +295,13 @@ window.TestMonkey = {};
 		}
 	}
 	
+	function getHtml(frame_doc)
+	{
+		var n = $(frame_doc.get(0).cloneNode(true));
+		n.find('#_firebugConsoleInjector,#_firebugConsole').remove();
+		return '<html>\n'+jQuery(n).html()+'\n</html>';
+	}
+	
 	var currentTestCase = null;
 	
 	$.fn.assertTestCase = function()
@@ -370,8 +377,7 @@ window.TestMonkey = {};
 			}
 			this.end=function(failed,timeout)
 			{
-				this.$('#'+descriptor.htmlID+'__testmonkey_magic').remove();
-				testcase.after_dom = '<html>\n'+frame_doc.html()+'\n</html>';
+				testcase.after_dom = getHtml(frame_doc);
 				if (!testcase.running) return;
 				if (timer)
 				{
@@ -439,7 +445,7 @@ window.TestMonkey = {};
 			}
 			
 			frame_doc = jQuery(body.parentNode);
-			testcase.before_dom = '<html>\n'+frame_doc.html()+'\n</html>';
+			testcase.before_dom = getHtml(frame_doc);
 			
 			var script = body.ownerDocument.createElement('script');
 			script.type = "text/javascript";
