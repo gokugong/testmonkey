@@ -324,6 +324,7 @@ window.TestMonkey = {};
 	}
 	
 	var currentTestCase = null;
+	var currentTestCaseId = 1;
 
 	//TODO: needed anymore?
 	$.fn.assertTestCase = function()
@@ -337,13 +338,15 @@ window.TestMonkey = {};
 		currentTestCase = testcase;
 		testcase.results = [];
 		testcase.running = true;
+		testcase.id = currentTestCaseId++;
 		var timer = null;
 		var count = 0;
 		var total = testcase.asserts.length;
+		var id = descriptor.htmlID+'_'+testcase.id;
 		
 		function getFrame()
 		{
-			return jQuery("#"+descriptor.htmlID).contents().find("html");
+			return jQuery("#"+id).contents().find("html");
 		}
 		window.testScope = function()
 		{
@@ -353,7 +356,6 @@ window.TestMonkey = {};
 			// environment as delegates
 			this.setup = function()
 			{
-				timer=setTimeout(function(){self.end(true,true)},testcase.timeout);
 				if (descriptor.setup) try { descriptor.setup(); } catch (E) {}
 			}
 			this.teardown = function()
@@ -452,14 +454,13 @@ window.TestMonkey = {};
 						testcase.results.push({'result':false,'message':testcase.message});
 					}
 					fireEvent('afterTestCase',testcase,descriptor);
-					removeTestFrame(descriptor.htmlID);
+					removeTestFrame(id);
 					executeNextTestCase();
 				}
 				catch (E)
 				{
 					alert('Error ending test: ' + E);
 				}
-				window.testMonkeyScope = null;
 			}
 		}
 		
@@ -469,10 +470,10 @@ window.TestMonkey = {};
 		
 		try
 		{
-			jQuery("<iframe style='position:absolute;left:-10px;top:-10px;height:1px;width:1px;' id='" + descriptor.htmlID+"'></iframe>").appendTo("body");
-			var body = jQuery("#"+descriptor.htmlID).contents().find("body").get(0);
+			jQuery("<iframe style='position:absolute;left:-10px;top:-10px;height:1px;width:1px;' id='" + (id)+"'></iframe>").appendTo("body");
+			var body = jQuery("#"+id).contents().find("body").get(0);
 			
-			if (!body) body = jQuery("#"+descriptor.htmlID).contents().find("html").get(0);
+			if (!body) body = jQuery("#"+id).contents().find("html").get(0);
 			
 			var doc = body.ownerDocument;
 			
@@ -506,13 +507,15 @@ window.TestMonkey = {};
 
 			$.info(jscode);
 			
+			// run the timer here in case we have problems loading the test HTML code itself
+			timer=setTimeout(function(){
+				testMonkeyScope.end(true,true)
+			},testcase.timeout);
+
 			// write the test + our bootstrap code
 			doc.open("text/html","replace");
-			$.info('after open')
 			doc.writeln(jscode);
-			$.info('after write')
 			doc.close();
-			$.info('after close')
 		}
 		catch(E)
 		{
