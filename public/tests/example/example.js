@@ -26,14 +26,12 @@ testSuite("Set of tests for Test Monkey",
 			assert(1 + foo);
 			end();
 		});
-
 		test("inline failures",function()
 		{
 			assert(false);
 		});
 		test("empty test",function()
 		{
-			
 		});
 	}
 })

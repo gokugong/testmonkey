@@ -1,6 +1,8 @@
 /*!(c) 2006-2008 Appcelerator, Inc. http://appcelerator.org
  * Licensed under the Apache License, Version 2.0. Please visit
  * http://license.appcelerator.com for full copy of the License.
+ *
+ * TestMonkey lives at http://github.com/jhaynie/testmonkey/tree/master
  **/
 window.TestMonkey = {};
 
@@ -8,199 +10,30 @@ window.TestMonkey = {};
 
 	var testRunnerPlugin = null;
 	
-	function fireEvent()
-	{
-		if (testRunnerPlugin)
-		{
-			var name = arguments[0], args = arguments.length > 1 ? $.makeArray(arguments).slice(1) : [];
-			var fn = testRunnerPlugin[name];
-			if (fn)
-			{
-				fn.apply(testRunnerPlugin,args);
-			}
-			// support a catch-all event handler
-			fn = testRunnerPlugin['onEvent'];
-			if (fn)
-			{
-				args.unshift(name);
-				fn.apply(testRunnerPlugin,args);
-			}
-		}
-	}
-
-	var assertions = {};
-	var currentDescriptor = null, currentSuite = null;
-	
+	/**
+	 * the plugin is responsible for driving the UI and doing
+	 * all the stuff responsible for setting up and executing
+	 * the test monkey system
+	 *
+	 */
 	TestMonkey.installTestRunnerPlugin = function(callback)
 	{
 		testRunnerPlugin = callback;
 	};
 	
+	var assertions = {};
+	/**
+	 * plugin to add your own assertion types.  name should be the 
+	 * name of the assertion and handler is the callback function to
+	 * execution the assertion.  all internal built-in assertions use
+	 * this same interface to register themselves. it is possible to
+	 * override the builtins by calling this method with same name as
+	 * a built-in assertion.
+	 */
 	TestMonkey.installAssertionType = function(name,handler)
 	{
 		assertions[name]=handler;
 	};
-	
-	scope.testRunner = function()
-	{
-		// cleanup in case we call this multiple times
-		currentDescriptor = currentSuite = currentTestCase = null;
-		testCases = [];
-		
-		var suites = [];
-		var it = typeof(arguments[0].push)=='function' ? arguments[0] : arguments;
-		$.each(it,function()
-		{
-			var descriptor = testSuites[this];
-			if (descriptor)
-			{
-				suites.push([this,descriptor]);
-			}
-		});
-
-		fireEvent('beforeTestRunner',suites);
-		
-		
-		// we first have to run through them so all the tests can be recorded
-		// they won't run at this point
-		$.each(suites,function()
-		{
-			var descriptor = currentDescriptor = this[1];
-			var name = currentSuite = this[0];
-			var error = false;
-			try
-			{
-				descriptor.run();
-			}
-			catch(E)
-			{
-				error = E;
-			}
-			currentDescriptor = null;
-		});
-
-		// set it to the first one in the list
-		currentSuite = null;
-		if (currentSuite) fireEvent('beforeTestSuite',suites[0][0]);
-
-		fireEvent('beforeTestCases',testCases);
-
-		fireEvent('beforeAssertionCount',assertCount);
-		var assertCount = 0;
-		
-		$.each(testCases,function()
-		{
-			var testcase = this;
-			assertCount += testcase.asserts.length;
-			testcase.running = false;
-			testcase.ready = true;
-		});
-		
-		fireEvent('afterAssertionCount',assertCount);
-		
-		var total = 0, loaded = 0;
-
-		// we need to load any pending HTML for the test
-		// and then wait until they're all complete before we 
-		// start running the test cases
-		$.each(suites,function()
-		{
-			var descriptor = this[1];
-			var html = descriptor.html;
-			if (html)
-			{
-				total+=1;
-				loadTestFrame(html,function(id)
-				{
-					// mark the id for the frame onto the descriptor
-					descriptor.htmlID = id;
-					loaded+=1;
-					if (loaded == total)
-					{
-						executeNextTestCase();
-					}
-				});
-			}
-			else
-			{
-				descriptor.htmlID = String(Math.round( Math.random() * 10000 ));
-			}
-		});
-
-		if (total==0)
-		{
-			executeNextTestCase();
-		}
-	}
-	
-	function executeNextTestCase()
-	{
-		var nextTestCase = null;
-		$.each(testCases,function()
-		{
-			if (this.ready)
-			{
-				nextTestCase = this;
-				return false;
-			}
-		});
-		
-		if (nextTestCase)
-		{
-			if (currentSuite!=nextTestCase.suite)
-			{
-				if (currentSuite)
-				{
-					fireEvent('afterTestSuite',currentSuite);
-					var currentD = testSuites[currentSuite];
-					if (currentD.htmlID) removeTestFrame(currentD.htmlID);
-				}
-				currentSuite = nextTestCase.suite;
-				fireEvent('beforeTestSuite',currentSuite);
-			}
-			nextTestCase.ready = false;
-			var testcase = nextTestCase;
-			fireEvent('beforeTestCase',testcase);
-			var descriptor = testcase.descriptor;
-			var error = false;
-			try
-			{
-				executeTest(testcase,descriptor);
-			}
-			catch(E)
-			{
-				error = E;
-				testcase.running = false;
-				testcase.error = E;
-				testcase.message = "Exception running testcase: "+E;
-			}
-		}
-		else
-		{
-			if (currentSuite)
-			{
-				fireEvent('afterTestSuite',currentSuite);
-				var currentD = testSuites[currentSuite];
-				if (currentD.htmlID) removeTestFrame(currentD.htmlID);
-			}
-			fireEvent('afterTestCases',testCases);
-			fireEvent('afterTestRunner');
-		}
-	}
-
-	function runAssertion(value)
-	{
-		switch(typeof(value))
-		{
-			case 'boolean':
-				return [value===true,value];
-			case 'function':
-				value = $.toFunction('(' + String(value) + ')()')();
-				return [(value ? true : false), value];
-			default:
-				return [(value ? true : false), value];
-		}
-	}
 	
 	TestMonkey.installAssertionType('',function(testcase,assertion,args)
 	{
@@ -271,6 +104,194 @@ window.TestMonkey = {};
 	{
 		return [!this.get(0).checked,this.get(0).checked];
 	});
+
+	function fireEvent()
+	{
+		if (testRunnerPlugin)
+		{
+			var name = arguments[0], args = arguments.length > 1 ? $.makeArray(arguments).slice(1) : [];
+			var fn = testRunnerPlugin[name];
+			$.info('firing '+name);
+			if (fn)
+			{
+				fn.apply(testRunnerPlugin,args);
+			}
+			// support a catch-all event handler
+			fn = testRunnerPlugin['onEvent'];
+			if (fn)
+			{
+				args.unshift(name);
+				fn.apply(testRunnerPlugin,args);
+			}
+		}
+	}
+
+	var currentDescriptor = null, currentSuite = null;
+	
+	
+	/**
+	 * called from the test execution environment to run the tests
+	 */
+	scope.testRunner = function()
+	{
+		// cleanup in case we call this multiple times
+		currentDescriptor = currentSuite = currentTestCase = null;
+		testCases = [];
+		
+		var suites = [];
+		var it = typeof(arguments[0].push)=='function' ? arguments[0] : arguments;
+		$.each(it,function()
+		{
+			var descriptor = testSuites[this];
+			if (descriptor)
+			{
+				suites.push([this,descriptor]);
+			}
+		});
+
+		fireEvent('beforeTestRunner',suites);
+		
+		
+		// we first have to run through them so all the tests can be recorded
+		// they won't run at this point
+		$.each(suites,function()
+		{
+			var descriptor = currentDescriptor = this[1];
+			var name = currentSuite = this[0];
+			var error = false;
+			try
+			{
+				descriptor.run();
+			}
+			catch(E)
+			{
+				error = E;
+			}
+			currentDescriptor = null;
+		});
+
+		// set it to the first one in the list
+		currentSuite = null;
+		if (currentSuite) fireEvent('beforeTestSuite',suites[0][0]);
+
+		fireEvent('beforeTestCases',testCases);
+
+		fireEvent('beforeAssertionCount');
+		var assertCount = 0;
+		
+		$.each(testCases,function()
+		{
+			var testcase = this;
+			assertCount += testcase.asserts.length;  
+			testcase.running = false;
+			testcase.ready = true;
+		});
+		
+		fireEvent('afterAssertionCount',assertCount);
+		
+		var total = 0, loaded = 0;
+
+		// we need to load any pending HTML for the test
+		// and then wait until they're all complete before we 
+		// start running the test cases
+		$.each(suites,function()
+		{
+			var descriptor = this[1];
+			var html = descriptor.html;
+			descriptor.htmlID = String(Math.round( Math.random() * 10000 ));
+			if (html)
+			{
+				total+=1;
+				loadTestFrame(html,function(content)
+				{
+					// mark the id for the frame onto the descriptor
+					descriptor.content = content;
+					loaded+=1;
+					if (loaded == total)
+					{
+						executeNextTestCase();
+					}
+				});
+			}
+			else
+			{
+				// we later use marker to indicate where we need to replace content
+				descriptor.content = "<html><head>####MARKER####</head><body></body></html>";
+			}
+		});
+
+		if (total==0)
+		{
+			executeNextTestCase();
+		}
+	}
+	
+	function executeNextTestCase()
+	{
+		var nextTestCase = null;
+		$.each(testCases,function()
+		{
+			if (this.ready)
+			{
+				nextTestCase = this;
+				return false;
+			}
+		});
+		
+		if (nextTestCase)
+		{
+			if (currentSuite!=nextTestCase.suite)
+			{
+				if (currentSuite)
+				{
+					fireEvent('afterTestSuite',currentSuite);
+					var currentD = testSuites[currentSuite];
+				}
+				currentSuite = nextTestCase.suite;
+				fireEvent('beforeTestSuite',currentSuite);
+			}
+			nextTestCase.ready = false;
+			var testcase = nextTestCase;
+			fireEvent('beforeTestCase',testcase);
+			var descriptor = testcase.descriptor;
+			var error = false;
+			try
+			{
+				executeTest(testcase,descriptor);
+			}
+			catch(E)
+			{
+				error = E;
+				testcase.running = false;
+				testcase.error = E;
+				testcase.message = "Exception running testcase: "+E;
+			}
+		}
+		else
+		{
+			if (currentSuite)
+			{
+				fireEvent('afterTestSuite',currentSuite);
+				var currentD = testSuites[currentSuite];
+			}
+			fireEvent('afterTestCases',testCases);
+			fireEvent('afterTestRunner');
+		}
+	}
+
+	function runAssertion(value)
+	{
+		switch(typeof(value))
+		{
+			case 'boolean':
+				return [value===true,value];
+			case 'function':
+				value = $.toFunction('(' + String(value) + ')()')();
+				return [(value ? true : false), value];
+			default:
+				return [(value ? true : false), value];
+		}
+	}
 	
 	function internalAssert()
 	{
@@ -295,15 +316,17 @@ window.TestMonkey = {};
 		}
 	}
 	
-	function getHtml(frame_doc)
+	function getHtml(f)
 	{
-		var n = $(frame_doc.get(0).cloneNode(true));
+		var n = $(f.get(0).cloneNode(true));
+		// pull out the firebug injected HTML since we don't really want to see that
 		n.find('#_firebugConsoleInjector,#_firebugConsole').remove();
 		return '<html>\n'+jQuery(n).html()+'\n</html>';
 	}
 	
 	var currentTestCase = null;
-	
+
+	//TODO: needed anymore?
 	$.fn.assertTestCase = function()
 	{
 		internalAssert.apply(this,arguments);
@@ -312,32 +335,26 @@ window.TestMonkey = {};
 	
 	function executeTest(testcase,descriptor)
 	{
+		currentTestCase = testcase;
 		testcase.results = [];
 		testcase.running = true;
-		currentTestCase = testcase;
 		var timer = null;
-		var frame_doc = null;
+		var count = 0;
+		var total = testcase.asserts.length;
+		
+		function getFrame()
+		{
+			return jQuery("#"+descriptor.htmlID).contents().find("html");
+		}
 		window.testScope = function()
 		{
 			var self = this;
-			this.jQuery = window.jQuery;
 			this.descriptor = descriptor;
-			this.internalAssert = internalAssert;
-			this.$ = function(selector)
-			{
-				var result = jQuery("#"+descriptor.htmlID).contents().find(selector);
-				result.assertTestCase = function()
-				{
-					if (testcase.running)
-					{
-						return internalAssert.apply(this,arguments);
-					}
-					return false;
-				};
-				return result;				
-			}
+			// these functions are specially mapped into the execution
+			// environment as delegates
 			this.setup = function()
 			{
+				timer=setTimeout(function(){self.end(true,true)},testcase.timeout);
 				if (descriptor.setup) try { descriptor.setup(); } catch (E) {}
 			}
 			this.teardown = function()
@@ -375,100 +392,128 @@ window.TestMonkey = {};
 				testcase.results.push({'result':false,'message':testcase.message});
 				self.end(true,false);
 			}
+			this.completed = function()
+			{
+				if (typeof(testcase.timeout)=='undefined')
+				{
+					self.end(false,false);
+				}
+			}
 			this.end=function(failed,timeout)
 			{
-				testcase.after_dom = getHtml(frame_doc);
-				if (!testcase.running) return;
+				count++;
 				if (timer)
 				{
 					clearTimeout(timer);
 					timer=null;
 				}
-				testcase.running = false;
-				if (failed)
+				if (timeout && count < total)
 				{
-					testcase.failed = true;
-				}
-				else
-				{
-					var passed = true;
-					jQuery.each(testcase.results,function()
+					// timeout the rest of the assertions
+					for (var c=count+1;c<total;c++)
 					{
-						if (!this.result)
-						{
-							passed=false;
-							return false;
-						}
-					});
-					testcase.failed = !passed;
-					if (passed && !testcase.message) testcase.message ="Assertions Passed";
-					if (!passed && !testcase.message) testcase.message = "Assertion Failures";
+						testcase.results.push({'result':false,'message':'timed out'});
+					}
 				}
-				if (timeout)
+				self.teardown();
+				var f = getFrame();
+				f.find('#__testMonkeySDK,#__testMonkeyJS').remove();
+				testcase.after_dom = getHtml(f);
+				try
 				{
-					testcase.timeout = true;
-					testcase.message = "Timed out";
-					testcase.results.push({'result':false,'message':testcase.message});
+					if (!testcase.running) return;
+					testcase.running = false;
+					if (failed)
+					{
+						testcase.failed = true;
+					}
+					else
+					{
+						var passed = true;
+						if (testcase.results.length == 0)
+						{
+							testcase.results.push({'result':true,'message':'passed'});
+						}
+						jQuery.each(testcase.results,function()
+						{
+							if (!this.result)
+							{
+								passed=false;
+								return false;
+							}
+						});
+						testcase.failed = !passed;
+						if (passed && !testcase.message) testcase.message ="Assertions Passed";
+						if (!passed && !testcase.message) testcase.message = "Assertion Failures";
+					}
+					if (timeout)
+					{
+						testcase.timeout = true;
+						testcase.message = "Timed out";
+						testcase.results.push({'result':false,'message':testcase.message});
+					}
+					fireEvent('afterTestCase',testcase,descriptor);
+					removeTestFrame(descriptor.htmlID);
+					executeNextTestCase();
 				}
-				fireEvent('afterTestCase',testcase,descriptor);
-				executeNextTestCase();
+				catch (E)
+				{
+					alert('Error ending test: ' + E);
+				}
+				window.testMonkeyScope = null;
 			}
 		}
-		var t = new window.testScope;
+		
+		// we keep it at global scope so the execution environment can
+		// easily use the running scope instance
+		window.testMonkeyScope = new window.testScope;
+		
 		try
 		{
-			
-			var code="var scope = parent ? new parent.window.testScope : window.testScope;\n";
-			code+="var jq = typeof(jQuery)=='undefined' ? scope.$ : jQuery;\n";
-			code+="try {\n";
-			code+= "(function($){\n";
-			code+="function log() { return scope.log.apply(this,arguments) }\n";
-			code+="function end() { return scope.end.apply(this,arguments) }\n";
-			code+="function fail() { return scope.fail.apply(this,arguments) }\n";
-			code+="function error() { return scope.error.apply(this,arguments) }\n";
-			code+="function assertTestCase() { return scope.assertTestCase.apply(this,arguments) }\n";
-			code+="scope.setup.call(scope.descriptor);\n";
-			code+='('+testcase.code+').call(scope.descriptor);\n';
-			code+='\n})(jq);\n';
-			code+="}catch(E){\n";
-			code+="scope.error(E);\n";
-			code+="}\n";
-			code+="scope.teardown.call(scope.descriptor);\n";
-			
+			jQuery("<iframe style='position:absolute;left:-10px;top:-10px;height:1px;width:1px;' id='" + descriptor.htmlID+"'></iframe>").appendTo("body");
 			var body = jQuery("#"+descriptor.htmlID).contents().find("body").get(0);
+			
+			if (!body) body = jQuery("#"+descriptor.htmlID).contents().find("html").get(0);
+			
+			var doc = body.ownerDocument;
+			
+			var setupCode = "" + 
+			"(function($,scope){\n"+
+			" $.noConflict();\n"+
+			" $(function(){\n "+	
+			"    $.fn.assertTestCase = function(){ return scope.assertTestCase.apply(this,arguments) }\n" + 
+			"    function log() { return scope.log.apply(this,arguments) }\n" + 
+			"    function end() { return scope.end.apply(this,arguments) }\n" + 
+			"    function fail() { return scope.fail.apply(this,arguments) }\n" + 
+			"    function error() { return scope.error.apply(this,arguments) }\n" + 
+			"    function assertTestCase() { return scope.assertTestCase.apply(this,arguments) }\n" + 
+			"    scope.setup.call(scope.descriptor);\n" + 
+			"    try{\n" + 
+			'      ('+testcase.code+').call(scope.descriptor);\n' + 
+			"    }catch(E){\n" + 
+			"      scope.error(E);\n" + 
+			"    }\n" + 
+			"    scope.completed();\n" + 
+			" });\n " + 
+			"})(window.jQuery,parent.window.testMonkeyScope);\n";
 
-			if (!body)
-			{
-				// in this case, they didn't load up any iframe - we need to dynamically create one (for test cases that don't specify html)
-				jQuery("<iframe style='position:absolute;left:-10px;top:-10px;height:1px;width:1px;' id='" + descriptor.htmlID+"'></iframe>").appendTo("body");
-				body = jQuery("#"+descriptor.htmlID).contents().find("body").get(0);
-			}
-			
-			frame_doc = jQuery(body.parentNode);
-			testcase.before_dom = getHtml(frame_doc);
-			
-			var script = body.ownerDocument.createElement('script');
-			script.type = "text/javascript";
-			script.id = descriptor.htmlID+'__testmonkey_magic';
-			if ( jQuery.browser.msie )
-			{
-				script.text = code;
-			}
-			else
-			{
-				script.appendChild( body.ownerDocument.createTextNode( code ) );
-			}
+			// inject our library
+			var code = "<script id=\"__testMonkeySDK\" type=\"text/javascript\" src=\"" + AppC.sdkJS + "\"></script>\n";
 
-			body.appendChild(script);
+			// now inject our test execution environment
+			code += "<script id=\"__testMonkeyJS\" type=\"text/javascript\">" + setupCode + "</script>\n";
+
+			var jscode = descriptor.content.replace('####MARKER####',code);
+
+			$.info(jscode);
 			
-			if (typeof(testcase.timeout)=='undefined')
-			{
-				t.end(false,false);
-			}
-			else
-			{
-				timer=setTimeout(function(){t.end(true,true)},testcase.timeout);
-			}
+			// write the test + our bootstrap code
+			doc.open("text/html","replace");
+			$.info('after open')
+			doc.writeln(jscode);
+			$.info('after write')
+			doc.close();
+			$.info('after close')
 		}
 		catch(E)
 		{
@@ -476,7 +521,7 @@ window.TestMonkey = {};
 			testcase.error = E;
 			testcase.message = "Exception running testcase: "+E;
 			testcase.results.push({'result':false,'error':E,'message':testcase.message});
-			t.end(true,false);
+			window.testMonkeyScope.end(true,false);
 		}
 	}
 	
@@ -520,10 +565,47 @@ window.TestMonkey = {};
 	{
 		var id = '__testdriver_content_'+(testFrameId++);
 		url = URI.absolutizeURI(url,AppC.docRoot+'tests/');
-		$("<iframe id='"+id+"' src='"+url+"' frameborder='0' height='1' width='1' style='position:absolute;left:-100px;top:-10px;'></iframe>").appendTo("body");
-		$('#'+id).load(function()
-		{
-			fn(id);
+		
+		return jQuery.ajax({
+			type: "GET",
+			url: url,
+			success: function(html)
+			{
+				// search to see what injection point we need to 
+				// put the code.  we want it to be at the earliest point
+				// possible. but it will not run until after the doc is loaded
+				var begin = html.indexOf('<head');
+				if (begin > 0)
+				{
+					begin = html.indexOf('>',begin);
+				}
+				else
+				{
+					begin = html.indexOf('<body');
+					if (begin < 0)
+					{
+						begin = html.indexOf('<html');
+						if (begin<0)
+						{
+							html = '<html>' + html + '</html>';
+							begin = 0;
+						}
+						begin = html.indexOf('>',begin);
+						html = html.substring(0,begin) + '<head></head>' + html.substring(begin+1);
+						begin = begin + 6;
+					}
+					else
+					{
+						html = html.substring(0,begin-1) + '<head></head>' + html.substring(begin);
+						begin = (begin-1) + 6;
+					}
+				}
+				var start = '';
+				if (begin>0) start = html.substring(0,begin);
+				var end = html.substring(begin);
+				// we later use marker to indicate where we need to replace content
+				fn(start + '####MARKER####' + end);
+			}
 		});
 	}
 	
@@ -531,14 +613,15 @@ window.TestMonkey = {};
 	{
 		// for this frame, we need to drop back to DOM instead of just .remove it seems
 		var el = $("#"+id);
-		// if (el.length > 0)
-		// {
-		// 	var node = el.get(0);
-		// 	setTimeout(function()
-		// 	{
-		// 		node.parentNode.removeChild(node);
-		// 	},10);
-		// }
+		if (el.length > 0)
+		{
+			var node = el.get(0);
+			// FF seems to not be happy if we remove to early (shows a spinning icon)
+			setTimeout(function()
+			{
+				node.parentNode.removeChild(node);
+			},10);
+		}
 	}
 	
 	function escapeString(str)
@@ -554,7 +637,7 @@ window.TestMonkey = {};
 		{
 			_asserts.push(m[0]); 
 			var prefix = m[1] ? '"' + escapeString(m[1]) + '"' : 'null';
-			var params = m[2];
+			var params = m[2] || 'null';
 			return 'assertTestCase(' + (_asserts.length-1) + ','+prefix+','+params+')';
 		});
 		var asserts = [];
