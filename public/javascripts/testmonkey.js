@@ -111,7 +111,6 @@ window.TestMonkey = {};
 		{
 			var name = arguments[0], args = arguments.length > 1 ? $.makeArray(arguments).slice(1) : [];
 			var fn = testRunnerPlugin[name];
-			$.info('firing '+name);
 			if (fn)
 			{
 				fn.apply(testRunnerPlugin,args);
