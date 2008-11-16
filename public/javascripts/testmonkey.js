@@ -7,7 +7,13 @@
 window.TestMonkey = {};
 
 (function(scope,$){
-
+	
+	if (typeof(AppC) != 'undefined')
+	{
+		// turn off report stats so it doesn't throw off tests
+		AppC.config.report_stats=false;
+	}
+		
 	var testRunnerPlugin = null;
 	
 	/**
@@ -35,74 +41,125 @@ window.TestMonkey = {};
 		assertions[name]=handler;
 	};
 	
-	TestMonkey.installAssertionType('',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('',function(win,frame,testcase,assertion,args)
 	{
 		return runAssertion(args[0]);
 	});
 	
-	TestMonkey.installAssertionType('Visible',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Visible',function(win,frame,testcase,assertion,args)
 	{
 		return [this.css('visibility')=='visible',this.css('visibility')];
 	});
 
-	TestMonkey.installAssertionType('Hidden',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Hidden',function(win,frame,testcase,assertion,args)
 	{
 		return [this.css('visibility')=='hidden',this.css('visibility')];
 	});
 
-	TestMonkey.installAssertionType('Disabled',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Disabled',function(win,frame,testcase,assertion,args)
 	{
 		return [this.attr('disabled'),this.attr('disabled')];
 	});
 
-	TestMonkey.installAssertionType('Enabled',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Enabled',function(win,frame,testcase,assertion,args)
 	{
 		return [!this.attr('disabled'),this.attr('disabled')];
 	});
 
-	TestMonkey.installAssertionType('CSS',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('CSS',function(win,frame,testcase,assertion,args)
 	{
 		return [this.css(args[0]) == args[1],this.css(args[0])];
 	});
 
-	TestMonkey.installAssertionType('Attr',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Attr',function(win,frame,testcase,assertion,args)
 	{
 		return [String(this.attr(args[0])) == String(args[1]),String(this.attr(args[0]))];
 	});
 
-	TestMonkey.installAssertionType('Class',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Class',function(win,frame,testcase,assertion,args)
 	{
 		return [this.hasClass(args[0]),this.attr('class')];
 	});
 	
-	TestMonkey.installAssertionType('HTML',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('HTML',function(win,frame,testcase,assertion,args)
 	{
 		return [this.html()==args[0],this.html()];
 	});
 
-	TestMonkey.installAssertionType('Value',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Value',function(win,frame,testcase,assertion,args)
 	{
 		return [this.val()==args[0],this.val()];
 	});
 
-	TestMonkey.installAssertionType('Text',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Text',function(win,frame,testcase,assertion,args)
 	{
 		return [this.text()==args[0],this.text()];
 	});
 
-	TestMonkey.installAssertionType('Empty',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Empty',function(win,frame,testcase,assertion,args)
 	{
 		return [this.text()=='',this.text()];
 	});
 
-	TestMonkey.installAssertionType('Checked',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Checked',function(win,frame,testcase,assertion,args)
 	{
 		return [this.get(0).checked,this.get(0).checked];
 	});
 
-	TestMonkey.installAssertionType('Unchecked',function(testcase,assertion,args)
+	TestMonkey.installAssertionType('Unchecked',function(win,frame,testcase,assertion,args)
 	{
 		return [!this.get(0).checked,this.get(0).checked];
+	});
+
+	TestMonkey.installAssertionType('Valid',function(win,frame,testcase,assertion,args)
+	{
+		var result = this.data('validatorResult');
+		return [result,result];
+	});
+
+	TestMonkey.installAssertionType('Invalid',function(win,frame,testcase,assertion,args)
+	{
+		var result = this.data('validatorResult');
+		return [!result,result];
+	});
+
+	TestMonkey.installAssertionType('Pub',function(win,frame,testcase,assertion,args)
+	{
+		// in this context, we're inside the top level window not the
+		// execution context, we can use win variable to get the window 
+		// context of the test
+		var q = win.AppC.getLastQueue();
+		if (!q)
+		{
+			return [false,"no message has been sent"];
+		}
+		var name = App.normalizePub(args[0]), data = args[1];
+		var lastPubType = q.name;
+		var lastPubData = q.data;
+		if (name!=lastPubType)
+		{
+			return [false,name+" was not correct. expected: "+name+", was: "+lastPubType];
+		}
+		if (!lastPubData)
+		{
+			return [false,name+" missing data payload: "+$.toJSON(data)];
+		}
+		if (data)
+		{
+			for (var key in data)
+			{
+				var v1 = lastPubData[key];
+				var v2 = data[key];
+				if (v1!=v2)
+				{
+					if (key!='event')
+					{
+						return [false,name+" has incorrect data payload entry for key: "+key+", expected: "+v2+", was: "+v1];
+					}
+				}
+			}
+		}
+		return [true,name+'=>'+$.toJSON(data)];
 	});
 
 	function fireEvent()
@@ -294,19 +351,21 @@ window.TestMonkey = {};
 	
 	function internalAssert()
 	{
-		var idx = arguments[0], type = arguments[1]||'';
-		var args = $.makeArray(arguments).splice(2);
+		var win = arguments[0], frame = arguments[1];
+		var idx = arguments[2], type = arguments[3]||'';
+		var args = $.makeArray(arguments).splice(4);
 		var result = false;
 		var testcase = currentTestCase;
 		var assert = testcase.asserts[idx];
+//		alert('internalAssert='+win+',frame='+frame+',idx='+idx+',type='+type);
 		try
 		{
 			var handler = assertions[type];
 			if (handler)
 			{
-				result = handler.apply(this,[testcase,assert,args]);
+				result = handler.apply(this,[win,frame,testcase,assert,args]);
 			}
-			var message = result[0] ? null : 'value was "' + result[1] + '" (' + typeof(result[1]) + ')';
+			var message = result ? result[0] ? null : 'value was "' + result[1] + '" (' + typeof(result[1]) + ')' : 'handler not found: '+type;
 			testcase.results.push({assert:assert,result:result[0],message:message,idx:idx});
 		}
 		catch (E)
@@ -326,13 +385,13 @@ window.TestMonkey = {};
 	var currentTestCase = null;
 	var currentTestCaseId = 1;
 
-	//TODO: needed anymore?
-	$.fn.assertTestCase = function()
-	{
-		internalAssert.apply(this,arguments);
-		return this;
-	};
-	
+	// //TODO: needed anymore?
+	// $.fn.assertTestCase = function()
+	// {
+	// 	internalAssert.apply(this,arguments);
+	// 	return this;
+	// };
+	// 
 	function executeTest(testcase,descriptor)
 	{
 		currentTestCase = testcase;
@@ -351,11 +410,13 @@ window.TestMonkey = {};
 		window.testScope = function()
 		{
 			var self = this;
+			var win = null;
 			this.descriptor = descriptor;
 			// these functions are specially mapped into the execution
 			// environment as delegates
-			this.setup = function()
+			this.setup = function(w)
 			{
+				win = w;
 				if (descriptor.setup) try { descriptor.setup(); } catch (E) {}
 			}
 			this.teardown = function()
@@ -366,7 +427,12 @@ window.TestMonkey = {};
 			{
 				if (testcase.running)
 				{
-					return internalAssert.apply(this,arguments);
+					var args = [win,getFrame()];
+					for (var c=0;c<arguments.length;c++)
+					{
+						args[c+2] = arguments[c];
+					}
+					return internalAssert.apply(this,args);
 				}
 				return false;
 			}
@@ -487,7 +553,7 @@ window.TestMonkey = {};
 			"    function fail() { return scope.fail.apply(this,arguments) }\n" + 
 			"    function error() { return scope.error.apply(this,arguments) }\n" + 
 			"    function assertTestCase() { return scope.assertTestCase.apply(this,arguments) }\n" + 
-			"    scope.setup.call(scope.descriptor);\n" + 
+			"    scope.setup.call(scope.descriptor,window);\n" + 
 			"    try{\n" + 
 			'      ('+testcase.code+').call(scope.descriptor);\n' + 
 			"    }catch(E){\n" + 
@@ -506,11 +572,14 @@ window.TestMonkey = {};
 			var jscode = descriptor.content.replace('####MARKER####',code);
 
 			$.info(jscode);
-			
-			// run the timer here in case we have problems loading the test HTML code itself
-			timer=setTimeout(function(){
-				testMonkeyScope.end(true,true)
-			},testcase.timeout);
+
+			if (typeof(testcase.timeout)!='undefined')
+			{
+				// run the timer here in case we have problems loading the test HTML code itself
+				timer=setTimeout(function(){
+					testMonkeyScope.end(true,true)
+				},testcase.timeout);
+			}
 
 			// write the test + our bootstrap code
 			doc.open("text/html","replace");
@@ -523,7 +592,7 @@ window.TestMonkey = {};
 			testcase.error = E;
 			testcase.message = "Exception running testcase: "+E;
 			testcase.results.push({'result':false,'error':E,'message':testcase.message});
-			window.testMonkeyScope.end(true,false);
+			testMonkeyScope.end(true,false);
 		}
 	}
 	
