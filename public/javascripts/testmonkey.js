@@ -385,13 +385,6 @@ window.TestMonkey = {};
 	var currentTestCase = null;
 	var currentTestCaseId = 1;
 
-	// //TODO: needed anymore?
-	// $.fn.assertTestCase = function()
-	// {
-	// 	internalAssert.apply(this,arguments);
-	// 	return this;
-	// };
-	// 
 	function executeTest(testcase,descriptor)
 	{
 		currentTestCase = testcase;
