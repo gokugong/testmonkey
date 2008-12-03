@@ -779,6 +779,7 @@ window.TestMonkey = {};
 	};
 	
 	scope.testSuites = {};
+	scope.testSuiteNames = [];
 	
 	scope.testSuite = function(name,html,descriptor)
 	{
@@ -789,6 +790,7 @@ window.TestMonkey = {};
 		}
 		
 		descriptor.html=html;
+		scope.testSuiteNames.push(name);
 		scope.testSuites[name]=descriptor;
 		
 		TestMonkey.fireEvent("addTestSuite",name,descriptor,html);

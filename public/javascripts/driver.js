@@ -71,12 +71,12 @@ $(document).ready(function()
 	$.getJSON(AppC.docRoot+'tests/manifest.js',function(json)
 	{
 		$.each(json.suites,function(i)
-		{
-			if (i == json.suites.length - 1) {
-				lastSuite = this;
-			}
-			
-			$.getScript(AppC.docRoot+'tests/'+this);
+		{	
+			$.getScript(AppC.docRoot+'tests/'+this, function() {
+					if (i == json.suites.length - 1) {
+						TestMonkey.fireEventAsync('manifestLoaded');
+					}
+			});
 		});
 	});
 	
@@ -128,8 +128,6 @@ $(document).ready(function()
 					if (lastTest == result) sel = 'selected';
 					
 					$("#selector select").append("<option "+sel+">"+result+"</option>");
-
-					if (lastTest == result) TestMonkey.fireEventAsync('manifestLoaded');
 					
 					break;
 				}
