@@ -14,7 +14,7 @@ window.TestMonkey = {};
 		AppC.config.report_stats=false;
 	}
 		
-	var testRunnerPlugin = null;
+	var testRunnerPlugins = [];
 	
 	/**
 	 * the plugin is responsible for driving the UI and doing
@@ -24,7 +24,7 @@ window.TestMonkey = {};
 	 */
 	TestMonkey.installTestRunnerPlugin = function(callback)
 	{
-		testRunnerPlugin = callback;
+		testRunnerPlugins.push(callback);
 	};
 	
 	var assertions = {};
@@ -162,11 +162,12 @@ window.TestMonkey = {};
 		return [true,name+'=>'+$.toJSON(data)];
 	});
 
-	function fireEvent()
+	TestMonkey.fireEvent = function()
 	{
-		if (testRunnerPlugin)
+		var name = arguments[0], args = arguments.length > 1 ? $.makeArray(arguments).slice(1) : [];
+		$.each(testRunnerPlugins, function()
 		{
-			var name = arguments[0], args = arguments.length > 1 ? $.makeArray(arguments).slice(1) : [];
+			var testRunnerPlugin = this;
 			var fn = testRunnerPlugin[name];
 			if (fn)
 			{
@@ -179,7 +180,7 @@ window.TestMonkey = {};
 				args.unshift(name);
 				fn.apply(testRunnerPlugin,args);
 			}
-		}
+		});
 	}
 
 	var currentDescriptor = null, currentSuite = null;
@@ -205,7 +206,7 @@ window.TestMonkey = {};
 			}
 		});
 
-		fireEvent('beforeTestRunner',suites);
+		TestMonkey.fireEvent('beforeTestRunner',suites);
 		
 		
 		// we first have to run through them so all the tests can be recorded
@@ -228,11 +229,11 @@ window.TestMonkey = {};
 
 		// set it to the first one in the list
 		currentSuite = null;
-		if (currentSuite) fireEvent('beforeTestSuite',suites[0][0]);
+		if (currentSuite) TestMonkey.fireEvent('beforeTestSuite',suites[0][0]);
 
-		fireEvent('beforeTestCases',testCases);
+		TestMonkey.fireEvent('beforeTestCases',testCases);
 
-		fireEvent('beforeAssertionCount');
+		TestMonkey.fireEvent('beforeAssertionCount');
 		var assertCount = 0;
 		
 		$.each(testCases,function()
@@ -243,7 +244,7 @@ window.TestMonkey = {};
 			testcase.ready = true;
 		});
 		
-		fireEvent('afterAssertionCount',assertCount);
+		TestMonkey.fireEvent('afterAssertionCount',assertCount);
 		
 		var total = 0, loaded = 0;
 
@@ -300,15 +301,15 @@ window.TestMonkey = {};
 			{
 				if (currentSuite)
 				{
-					fireEvent('afterTestSuite',currentSuite);
+					TestMonkey.fireEvent('afterTestSuite',currentSuite);
 					var currentD = testSuites[currentSuite];
 				}
 				currentSuite = nextTestCase.suite;
-				fireEvent('beforeTestSuite',currentSuite);
+				TestMonkey.fireEvent('beforeTestSuite',currentSuite);
 			}
 			nextTestCase.ready = false;
 			var testcase = nextTestCase;
-			fireEvent('beforeTestCase',testcase);
+			TestMonkey.fireEvent('beforeTestCase',testcase);
 			var descriptor = testcase.descriptor;
 			var error = false;
 			try
@@ -327,11 +328,11 @@ window.TestMonkey = {};
 		{
 			if (currentSuite)
 			{
-				fireEvent('afterTestSuite',currentSuite);
+				TestMonkey.fireEvent('afterTestSuite',currentSuite);
 				var currentD = testSuites[currentSuite];
 			}
-			fireEvent('afterTestCases',testCases);
-			fireEvent('afterTestRunner');
+			TestMonkey.fireEvent('afterTestCases',testCases);
+			TestMonkey.fireEvent('afterTestRunner');
 		}
 	}
 
@@ -512,7 +513,7 @@ window.TestMonkey = {};
 						testcase.message = "Timed out";
 						testcase.results.push({'result':false,'message':testcase.message});
 					}
-					fireEvent('afterTestCase',testcase,descriptor);
+					TestMonkey.fireEvent('afterTestCase',testcase,descriptor);
 					removeTestFrame(id);
 					executeNextTestCase();
 				}
@@ -765,7 +766,7 @@ window.TestMonkey = {};
 		descriptor.html=html;
 		testSuites[name]=descriptor;
 		
-		fireEvent("addTestSuite",name,descriptor,html);
+		TestMonkey.fireEvent("addTestSuite",name,descriptor,html);
 		
 		this.run = function()
 		{
