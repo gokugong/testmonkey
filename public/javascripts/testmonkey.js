@@ -180,7 +180,32 @@ window.TestMonkey = {};
 				args.unshift(name);
 				fn.apply(testRunnerPlugin,args);
 			}
+			else
+			{
+				fn = testRunnerPlugin['on' + name.substring(0,1).toUpperCase() + name.substring(1)];
+				if (fn) {
+					fn.apply(testRunnerPlugin, args);
+				}
+			}
 		});
+	}
+	
+	TestMonkey.fireEventAsync = function()
+	{
+		var timeout = 1000;
+		var args = [];
+		if (arguments.length > 0) {
+			if (typeof(arguments[0]) == 'number') {
+				timeout = arguments[0];
+				args = $.makeArray(arguments).slice(1);
+			} else {
+				args = $.makeArray(arguments);
+			}
+		}
+		
+		setTimeout(function () {
+			TestMonkey.fireEvent.apply(null, args);
+		}, timeout);
 	}
 
 	var currentDescriptor = null, currentSuite = null;
@@ -199,7 +224,7 @@ window.TestMonkey = {};
 		var it = typeof(arguments[0].push)=='function' ? arguments[0] : arguments;
 		$.each(it,function()
 		{
-			var descriptor = testSuites[this];
+			var descriptor = scope.testSuites[this];
 			if (descriptor)
 			{
 				suites.push([this,descriptor]);
@@ -302,7 +327,7 @@ window.TestMonkey = {};
 				if (currentSuite)
 				{
 					TestMonkey.fireEvent('afterTestSuite',currentSuite);
-					var currentD = testSuites[currentSuite];
+					var currentD = scope.testSuites[currentSuite];
 				}
 				currentSuite = nextTestCase.suite;
 				TestMonkey.fireEvent('beforeTestSuite',currentSuite);
@@ -329,7 +354,7 @@ window.TestMonkey = {};
 			if (currentSuite)
 			{
 				TestMonkey.fireEvent('afterTestSuite',currentSuite);
-				var currentD = testSuites[currentSuite];
+				var currentD = scope.testSuites[currentSuite];
 			}
 			TestMonkey.fireEvent('afterTestCases',testCases);
 			TestMonkey.fireEvent('afterTestRunner');
@@ -753,7 +778,7 @@ window.TestMonkey = {};
 		});
 	};
 	
-	var testSuites = {};
+	scope.testSuites = {};
 	
 	scope.testSuite = function(name,html,descriptor)
 	{
@@ -764,7 +789,7 @@ window.TestMonkey = {};
 		}
 		
 		descriptor.html=html;
-		testSuites[name]=descriptor;
+		scope.testSuites[name]=descriptor;
 		
 		TestMonkey.fireEvent("addTestSuite",name,descriptor,html);
 		

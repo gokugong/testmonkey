@@ -67,18 +67,21 @@ $(document).ready(function()
 		}
 	});
 	
+	var lastSuite = null;
 	$.getJSON(AppC.docRoot+'tests/manifest.js',function(json)
 	{
-		$.each(json.suites,function()
+		$.each(json.suites,function(i)
 		{
+			if (i == json.suites.length - 1) {
+				lastSuite = this;
+			}
+			
 			$.getScript(AppC.docRoot+'tests/'+this);
 		});
 	});
 	
 	$("#run").on("click",function()
 	{
-		// resetStats();
-		// $('#test_summary_title').show();
 		var test = $("#selector select").val();
 		$.cookie('testmonkey.test',test); // remember the last test we ran
 		testRunner(test);
@@ -123,7 +126,11 @@ $(document).ready(function()
 					var lastTest = $.cookie('testmonkey.test');
 					var sel = '';
 					if (lastTest == result) sel = 'selected';
+					
 					$("#selector select").append("<option "+sel+">"+result+"</option>");
+
+					if (lastTest == result) TestMonkey.fireEventAsync('manifestLoaded');
+					
 					break;
 				}
 				case 'beforeTestSuite':
