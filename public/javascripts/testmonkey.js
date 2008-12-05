@@ -667,7 +667,7 @@ window.TestMonkey = {};
 				var begin = html.indexOf('<head');
 				if (begin > 0)
 				{
-					begin = html.indexOf('>',begin);
+					begin = html.indexOf('>',begin+1);
 				}
 				else
 				{
