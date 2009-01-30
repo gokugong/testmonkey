@@ -14,7 +14,7 @@ window.TestMonkey = {};
 		AppC.config.report_stats=false;
 	}
 		
-	var testRunnerPlugins = [];
+	var testRunnerPlugin = null;
 	
 	/**
 	 * the plugin is responsible for driving the UI and doing
@@ -24,7 +24,7 @@ window.TestMonkey = {};
 	 */
 	TestMonkey.installTestRunnerPlugin = function(callback)
 	{
-		testRunnerPlugins.push(callback);
+		testRunnerPlugin = callback;
 	};
 	
 	var assertions = {};
@@ -43,6 +43,10 @@ window.TestMonkey = {};
 	
 	TestMonkey.installAssertionType('',function(win,frame,testcase,assertion,args)
 	{
+		return runAssertion(args[0]);
+	});
+	TestMonkey.installAssertionType('After',function(win,frame,testcase,assertion,args)
+	{		
 		return runAssertion(args[0]);
 	});
 	
@@ -142,7 +146,7 @@ window.TestMonkey = {};
 		}
 		if (!lastPubData)
 		{
-			return [false,name+" missing data payload: "+$.toJSON(data)];
+			return [false,name+" missing data payload: "+swiss.toJSON(data)];
 		}
 		if (data)
 		{
@@ -159,15 +163,14 @@ window.TestMonkey = {};
 				}
 			}
 		}
-		return [true,name+'=>'+$.toJSON(data)];
+		return [true,name+'=>'+swiss.toJSON(data)];
 	});
 
-	TestMonkey.fireEvent = function()
+	function fireEvent()
 	{
-		var name = arguments[0], args = arguments.length > 1 ? $.makeArray(arguments).slice(1) : [];
-		$.each(testRunnerPlugins, function()
+		if (testRunnerPlugin)
 		{
-			var testRunnerPlugin = this;
+			var name = arguments[0], args = arguments.length > 1 ? $.makeArray(arguments).slice(1) : [];
 			var fn = testRunnerPlugin[name];
 			if (fn)
 			{
@@ -180,32 +183,7 @@ window.TestMonkey = {};
 				args.unshift(name);
 				fn.apply(testRunnerPlugin,args);
 			}
-			else
-			{
-				fn = testRunnerPlugin['on' + name.substring(0,1).toUpperCase() + name.substring(1)];
-				if (fn) {
-					fn.apply(testRunnerPlugin, args);
-				}
-			}
-		});
-	}
-	
-	TestMonkey.fireEventAsync = function()
-	{
-		var timeout = 1000;
-		var args = [];
-		if (arguments.length > 0) {
-			if (typeof(arguments[0]) == 'number') {
-				timeout = arguments[0];
-				args = $.makeArray(arguments).slice(1);
-			} else {
-				args = $.makeArray(arguments);
-			}
 		}
-		
-		setTimeout(function () {
-			TestMonkey.fireEvent.apply(null, args);
-		}, timeout);
 	}
 
 	var currentDescriptor = null, currentSuite = null;
@@ -224,14 +202,14 @@ window.TestMonkey = {};
 		var it = typeof(arguments[0].push)=='function' ? arguments[0] : arguments;
 		$.each(it,function()
 		{
-			var descriptor = scope.testSuites[this];
+			var descriptor = testSuites[this];
 			if (descriptor)
 			{
 				suites.push([this,descriptor]);
 			}
 		});
 
-		TestMonkey.fireEvent('beforeTestRunner',suites);
+		fireEvent('beforeTestRunner',suites);
 		
 		
 		// we first have to run through them so all the tests can be recorded
@@ -254,12 +232,13 @@ window.TestMonkey = {};
 
 		// set it to the first one in the list
 		currentSuite = null;
-		if (currentSuite) TestMonkey.fireEvent('beforeTestSuite',suites[0][0]);
+		if (currentSuite) fireEvent('beforeTestSuite',suites[0][0]);
 
-		TestMonkey.fireEvent('beforeTestCases',testCases);
+		fireEvent('beforeTestCases',testCases);
 
-		TestMonkey.fireEvent('beforeAssertionCount');
+		fireEvent('beforeAssertionCount');
 		var assertCount = 0;
+		
 		
 		$.each(testCases,function()
 		{
@@ -269,7 +248,7 @@ window.TestMonkey = {};
 			testcase.ready = true;
 		});
 		
-		TestMonkey.fireEvent('afterAssertionCount',assertCount);
+		fireEvent('afterAssertionCount',assertCount);
 		
 		var total = 0, loaded = 0;
 
@@ -326,15 +305,15 @@ window.TestMonkey = {};
 			{
 				if (currentSuite)
 				{
-					TestMonkey.fireEvent('afterTestSuite',currentSuite);
-					var currentD = scope.testSuites[currentSuite];
+					fireEvent('afterTestSuite',currentSuite);
+					var currentD = testSuites[currentSuite];
 				}
 				currentSuite = nextTestCase.suite;
-				TestMonkey.fireEvent('beforeTestSuite',currentSuite);
+				fireEvent('beforeTestSuite',currentSuite);
 			}
 			nextTestCase.ready = false;
 			var testcase = nextTestCase;
-			TestMonkey.fireEvent('beforeTestCase',testcase);
+			fireEvent('beforeTestCase',testcase);
 			var descriptor = testcase.descriptor;
 			var error = false;
 			try
@@ -353,11 +332,11 @@ window.TestMonkey = {};
 		{
 			if (currentSuite)
 			{
-				TestMonkey.fireEvent('afterTestSuite',currentSuite);
-				var currentD = scope.testSuites[currentSuite];
+				fireEvent('afterTestSuite',currentSuite);
+				var currentD = testSuites[currentSuite];
 			}
-			TestMonkey.fireEvent('afterTestCases',testCases);
-			TestMonkey.fireEvent('afterTestRunner');
+			fireEvent('afterTestCases',testCases);
+			fireEvent('afterTestRunner');
 		}
 	}
 
@@ -379,14 +358,24 @@ window.TestMonkey = {};
 	{
 		var win = arguments[0], frame = arguments[1];
 		var idx = arguments[2], type = arguments[3]||'';
-		var args = $.makeArray(arguments).splice(4);
+		
+		// NWW: IE HAD A PROBLEM  WITH SINGLE ARG SPLICE, ADDED 2nd ARG
+		var args = null;
+		if (App.Browser.isIE)
+		{
+			args = $.makeArray(arguments).splice(4,4);
+		}
+		else
+		{
+			args = $.makeArray(arguments).splice(4);
+		}
 		var result = false;
 		var testcase = currentTestCase;
 		var assert = testcase.asserts[idx];
-//		alert('internalAssert='+win+',frame='+frame+',idx='+idx+',type='+type);
+
+		var handler = assertions[type];
 		try
 		{
-			var handler = assertions[type];
 			if (handler)
 			{
 				result = handler.apply(this,[win,frame,testcase,assert,args]);
@@ -398,19 +387,34 @@ window.TestMonkey = {};
 		{
 			testcase.results.push({assert:assert,result:false,error:E,message:String(E),idx:idx});
 		}
+		
+		// call end if assetion type is After
+		// and the 'end' argument is true
+		if (type == 'After' && args[2] == true)
+		{
+			testMonkeyScope.end(!result,false);
+		}
 	}
 	
 	function getHtml(f)
 	{
-		var n = $(f.get(0).cloneNode(true));
-		// pull out the firebug injected HTML since we don't really want to see that
-		n.find('#_firebugConsoleInjector,#_firebugConsole').remove();
-		return '<html>\n'+jQuery(n).html()+'\n</html>';
+		// var n = $(f.get(0).cloneNode(true));
+		// // pull out the firebug injected HTML since we don't really want to see that
+		// n.find('#_firebugConsoleInjector,#_firebugConsole').remove();
+		// return '<html>\n'+jQuery(n).html()+'\n</html>';
+		return '';
 	}
 	
 	var currentTestCase = null;
 	var currentTestCaseId = 1;
 
+	// //TODO: needed anymore?
+	// $.fn.assertTestCase = function()
+	// {
+	// 	internalAssert.apply(this,arguments);
+	// 	return this;
+	// };
+	// 
 	function executeTest(testcase,descriptor)
 	{
 		currentTestCase = testcase;
@@ -465,6 +469,7 @@ window.TestMonkey = {};
 			}
 			this.error = function(E)
 			{
+				
 				testcase.failed = true;
 				testcase.error = E;
 				testcase.message = "Exception running testcase: "+E;
@@ -473,6 +478,9 @@ window.TestMonkey = {};
 			}
 			this.fail=function(msg)
 			{
+				App.Util.Logger.info('failed')
+				
+
 				testcase.message = msg;
 				testcase.explicitFailure = true;
 				testcase.results.push({'result':false,'message':testcase.message});
@@ -502,14 +510,17 @@ window.TestMonkey = {};
 					}
 				}
 				self.teardown();
+				
 				var f = getFrame();
-				f.find('#__testMonkeySDK,#__testMonkeyJS').remove();
+				//f.find('#__testMonkeySDK,#__testMonkeyJS').remove();
+				f.find('.testmonkey_libs').remove();
+				
 				testcase.after_dom = getHtml(f);
 				try
 				{
 					if (!testcase.running) return;
 					testcase.running = false;
-					if (failed)
+					if (failed == true)
 					{
 						testcase.failed = true;
 					}
@@ -538,9 +549,10 @@ window.TestMonkey = {};
 						testcase.message = "Timed out";
 						testcase.results.push({'result':false,'message':testcase.message});
 					}
-					TestMonkey.fireEvent('afterTestCase',testcase,descriptor);
+					fireEvent('afterTestCase',testcase,descriptor);
 					removeTestFrame(id);
 					executeNextTestCase();
+					
 				}
 				catch (E)
 				{
@@ -552,67 +564,89 @@ window.TestMonkey = {};
 		// we keep it at global scope so the execution environment can
 		// easily use the running scope instance
 		window.testMonkeyScope = new window.testScope;
-		
-		try
+	
+		$.getJSON(App.docRoot + 'tests/manifest.js',function(json)
 		{
-			jQuery("<iframe style='position:absolute;left:-10px;top:-10px;height:1px;width:1px;' id='" + (id)+"'></iframe>").appendTo("body");
-			var body = jQuery("#"+id).contents().find("body").get(0);
+			var code = '\n';
 			
-			if (!body) body = jQuery("#"+id).contents().find("html").get(0);
-			
-			var doc = body.ownerDocument;
-			
-			var setupCode = "" + 
-			"(function($,scope){\n"+
-			" $.noConflict();\n"+
-			" $(function(){\n "+	
-			"    $.fn.assertTestCase = function(){ return scope.assertTestCase.apply(this,arguments) }\n" + 
-			"    function log() { return scope.log.apply(this,arguments) }\n" + 
-			"    function end() { return scope.end.apply(this,arguments) }\n" + 
-			"    function fail() { return scope.fail.apply(this,arguments) }\n" + 
-			"    function error() { return scope.error.apply(this,arguments) }\n" + 
-			"    function assertTestCase() { return scope.assertTestCase.apply(this,arguments) }\n" + 
-			"    scope.setup.call(scope.descriptor,window);\n" + 
-			"    try{\n" + 
-			'      ('+testcase.code+').call(scope.descriptor);\n' + 
-			"    }catch(E){\n" + 
-			"      scope.error(E);\n" + 
-			"    }\n" + 
-			"    scope.completed();\n" + 
-			" });\n " + 
-			"})(window.jQuery,parent.window.testMonkeyScope);\n";
-
-			// inject our library
-			var code = "<script id=\"__testMonkeySDK\" type=\"text/javascript\" src=\"" + AppC.sdkJS + "\"></script>\n";
-
-			// now inject our test execution environment
-			code += "<script id=\"__testMonkeyJS\" type=\"text/javascript\">" + setupCode + "</script>\n";
-
-			var jscode = descriptor.content.replace('####MARKER####',code);
-
-			$.info(jscode);
-
-			if (typeof(testcase.timeout)!='undefined')
+			// load third-party libs needed for tests
+			$.each(json.libs,function()
 			{
-				// run the timer here in case we have problems loading the test HTML code itself
-				timer=setTimeout(function(){
-					testMonkeyScope.end(true,true)
-				},testcase.timeout);
+				code += "<script type=\"text/javascript\" class=\"testmonkey_libs\"  src=\""+this+"\"></script>\n";
+			});
+			try
+			{
+				//jQuery("<iframe style='position:absolute;left:-10px;top:-10px;height:1px;width:1px;' id='" + (id)+"'></iframe>").appendTo("body");
+				var body = jQuery('iframe').contents().find("body").get(0);
+
+				if (!body) body = jQuery('iframe').contents().find("html").get(0);
+
+				var doc = body.ownerDocument;
+				var setupCode = "" + 
+				"(function($,scope){\n"+
+				" $.noConflict();\n"+
+				" $(function(){\n "+
+				"    $.fn.assertTestCase = function(){ return scope.assertTestCase.apply(this,arguments) }\n" + 
+				"    function log() { return scope.log.apply(this,arguments) }\n" + 
+				"    function end() { return scope.end.apply(this,arguments) }\n" + 
+				"    function fail() { return scope.fail.apply(this,arguments) }\n" + 
+				"    function error() { return scope.error.apply(this,arguments) }\n" + 
+				"    function assertTestCase() {return scope.assertTestCase.apply(this,arguments) }\n" + 
+				"    scope.setup.call(scope.descriptor,window);\n ";
+				
+				// IE 'ISMS
+				if (App.Browser.isIE)
+				{
+					setupCode += "setTimeout(function(){try{\n" + 
+					'   ('+testcase.code+').call(scope.descriptor);\n' + 
+					"    }catch(E){\n" + 
+					"      scope.error(E);\n" + 
+					"    }scope.completed();},500);\n" + 
+					" });\n })(parent.window.jQuery,parent.window.testMonkeyScope);\n";
+				}
+				else
+				{
+					setupCode += "try{\n" + 
+					'   ('+testcase.code+').call(scope.descriptor);\n' + 
+					"    }catch(E){\n" + 
+					"      scope.error(E);\n" + 
+					"    }\n" + 
+					"    scope.completed();\n" + 
+					" });\n })(window.jQuery,parent.window.testMonkeyScope);\n ";
+				}
+
+
+				// now inject our test execution environment
+				code+= "<script  class=\"testmonkey_libs\" type=\"text/javascript\">" + setupCode + "</script>\n";
+				var jscode = descriptor.content.replace('####MARKER####',code);
+				
+				// REMOVED TIMEOUT FEATURE - THERE WAS A TIMING ISSUE
+				// WHERE TESTS WOULD TIMEOUT WHEN THE SHOULD NOT HAVE
+				// if (typeof(testcase.timeout)!='undefined')
+				// {
+				// 	// run the timer here in case we have problems loading the test HTML code itself
+				// 	//timer=setTimeout(function(){
+				// 	//	testMonkeyScope.end(true,true)
+				// 	//},testcase.timeout);
+				// }
+
+				// write the test + our bootstrap code
+				doc.open("text/html","replace");
+				doc.writeln(jscode);
+				doc.close();
+			}
+			catch(E)
+			{
+				testcase.failed = true;
+				testcase.error = E;
+				testcase.message = "Exception running testcase: "+E;
+				testcase.results.push({'result':false,'error':E,'message':testcase.message});
+				testMonkeyScope.end(true,false);
 			}
 
-			// write the test + our bootstrap code
-			doc.open("text/html","replace");
-			doc.writeln(jscode);
-			doc.close();
-		}
-		catch(E)
-		{
-			testcase.failed = true;
-			testcase.error = E;
-			testcase.message = "Exception running testcase: "+E;
-			testcase.results.push({'result':false,'error':E,'message':testcase.message});
-			testMonkeyScope.end(true,false);
-		}
+		});
+	
+	
 	}
 	
 	scope.extractCodeLine = function (code,expr)
@@ -650,12 +684,10 @@ window.TestMonkey = {};
 	}
 	
 	var testFrameId = 1;
-	
 	function loadTestFrame(url,fn)
 	{
 		var id = '__testdriver_content_'+(testFrameId++);
-		url = URI.absolutizeURI(url,AppC.docRoot+'tests/');
-		
+		url = App.URI.absolutizeURI(url,App.docRoot+'tests/');
 		return jQuery.ajax({
 			type: "GET",
 			url: url,
@@ -667,7 +699,7 @@ window.TestMonkey = {};
 				var begin = html.indexOf('<head');
 				if (begin > 0)
 				{
-					begin = html.indexOf('>',begin+1);
+					begin = html.indexOf('>',begin);
 				}
 				else
 				{
@@ -694,6 +726,7 @@ window.TestMonkey = {};
 				if (begin>0) start = html.substring(0,begin);
 				var end = html.substring(begin);
 				// we later use marker to indicate where we need to replace content
+				
 				fn(start + '####MARKER####' + end);
 			}
 		});
@@ -716,19 +749,31 @@ window.TestMonkey = {};
 	
 	function escapeString(str)
 	{
-		return $.gsub(str,'"',"\\\"");
+		return str.gsub('"',"\\\"");
 	}
 	
 	function preProcessCode(code)
 	{
 		var re = /assert(.*?)[\s]?\((.*)?\)/;
 		var _asserts = [];
-		var newcode = $.gsub(code,re,function(m)
+		var newcode = code.gsub(re,function(m)
 		{
 			_asserts.push(m[0]); 
 			var prefix = m[1] ? '"' + escapeString(m[1]) + '"' : 'null';
 			var params = m[2] || 'null';
-			return 'assertTestCase(' + (_asserts.length-1) + ','+prefix+','+params+')';
+			
+			// if assertion type is after
+			// setup timeout
+			if (prefix == '"After"')
+			{
+				var args = params.split(",");
+				var funcString = 'setTimeout(function(){assertTestCase(' + (_asserts.length-1) + ','+prefix+','+params+')},'+args[1]+')';
+				return funcString;
+			}
+			else
+			{
+				return 'assertTestCase(' + (_asserts.length-1) + ','+prefix+','+params+')';				
+			}
 		});
 		var asserts = [];
 		$.each(_asserts,function()
@@ -778,8 +823,7 @@ window.TestMonkey = {};
 		});
 	};
 	
-	scope.testSuites = {};
-	scope.testSuiteNames = [];
+	var testSuites = {};
 	
 	scope.testSuite = function(name,html,descriptor)
 	{
@@ -790,10 +834,9 @@ window.TestMonkey = {};
 		}
 		
 		descriptor.html=html;
-		scope.testSuiteNames.push(name);
-		scope.testSuites[name]=descriptor;
+		testSuites[name]=descriptor;
 		
-		TestMonkey.fireEvent("addTestSuite",name,descriptor,html);
+		fireEvent("addTestSuite",name,descriptor,html);
 		
 		this.run = function()
 		{
